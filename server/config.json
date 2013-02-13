@@ -1,0 +1,7 @@
+{
+    "datapath": "data",
+    "port": 8000,
+    "directories": [
+        { "name": "Movies", "path": "/Users/Brian/Movies" }
+    ]
+}

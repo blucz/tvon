@@ -30,7 +30,7 @@
 
 - (void)speechRecognizer:(NSSpeechRecognizer *)sender didRecognizeCommand:(id)aCmd {
     printf("tv on indeed\n");
-    system("./play samsung_tv_power.wav");
+    system("./tv_power_toggle");
 }
 
 - (void)dealloc {
