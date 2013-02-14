@@ -3,15 +3,16 @@ TV ON
 
 ------
 - discover video content automatically
+- multiple user profiles
 - keep db of videos including:
     - date added
-    - metadata from imdb api (if any)
+    - metadata from imdb api
     - play history per profile
 - exposes universe-like browse hierarchy
 - web server/remote control
 - select profile
 
-hierarchy:
+Browse Hierarchy:
 
 My Queue
     TV 
