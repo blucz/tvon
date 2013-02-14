@@ -2,6 +2,6 @@
     "datapath": "data",
     "port": 8000,
     "directories": [
-        { "name": "Movies", "path": "/Users/Brian/Movies" }
+        { "id": "1", "name": "Movies", "path": "/Users/Brian/Movies" }
     ]
 }

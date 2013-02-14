@@ -11,21 +11,24 @@ import scala.collection.JavaConversions._
 trait StorageFile {
   def key       : String
   def path      : Path   
-  def modtime   : Long
+  def modTime   : Long
   def length    : Option[Long]
   def signature : Option[Array[Byte]]
 }
 
-case class ExistingFile(key: String, modtime: Long)
+case class ExistingFile(key: String, modTime: Long)
 
 object StorageBackend {
   abstract class Event
-  case class FilesAdded   (files: List[StorageFile]) extends Event
-  case class FilesModified(files: List[StorageFile]) extends Event
-  case class FilesRemoved (files: List[StorageFile]) extends Event
+  case class FilesAdded   (backend: StorageBackend, files: List[StorageFile]) extends Event
+  case class FilesModified(backend: StorageBackend, files: List[StorageFile]) extends Event
+  case class FilesRemoved (backend: StorageBackend, files: List[StorageFile]) extends Event
+  case class Online       (backend: StorageBackend)
+  case class Offline      (backend: StorageBackend)
 }
 
 trait StorageBackend {
+  def id : String
   def watch(existing: List[ExistingFile], listener: Actor) : CancelationToken
 }
 
@@ -36,19 +39,22 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
   var rootpath         = Paths.get(config.path).toAbsolutePath()
   var rootpathstring   = rootpath.toString()
 
+  def id: String = config.id
+
   def watch(existing: List[ExistingFile], listener: Actor) : CancelationToken = {
     if (this.listener != null) {
       throw new IllegalStateException("dirstorage only supports one watch at a time")
     }
+    this.listener = listener
     populate(existing)
     ThreadPool.queueLongRunning(watcher_thread)
-    this.listener = listener
+    listener ! StorageBackend.Online(this)
     return new CancelationToken {
       def cancel() { DirectoryStorageBackend.this.listener = null }
     }
   }
 
-  class File(var dir: Dir, var name: String, var path: Path, var modtime: Long) extends StorageFile {
+  class File(var dir: Dir, var name: String, var path: Path, var modTime: Long) extends StorageFile {
     var cached           : Boolean             = false
     var cached_signature : Option[Array[Byte]] = None
     var cached_length    : Option[Long]        = None
@@ -101,8 +107,8 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
     }
 
     def updateModTime(newmodtime: Long): Boolean = {
-      if (newmodtime != modtime) {
-        modtime  = newmodtime
+      if (newmodtime != modTime) {
+        modTime  = newmodtime
         cached   = false
         return true
       } else {
@@ -147,28 +153,28 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
 
   def flush_adds() {
     if (pending_adds.size() > 0) {
-      listener ! StorageBackend.FilesAdded(pending_adds.toList)
+      listener ! StorageBackend.FilesAdded(this, pending_adds.toList)
       pending_adds.clear()
     }
   }
 
   def flush_removes() {
     if (pending_removes.size() > 0) {
-      listener ! StorageBackend.FilesRemoved(pending_removes.toList)
+      listener ! StorageBackend.FilesRemoved(this, pending_removes.toList)
       pending_removes.clear()
     }
   }
 
   def flush_mods() {
     if (pending_mods.size() > 0) {
-      listener ! StorageBackend.FilesModified(pending_mods.toList)
+      listener ! StorageBackend.FilesModified(this, pending_mods.toList)
       pending_mods.clear()
     }
   }
 
   def flush() {
-    flush_adds()
     flush_removes()
+    flush_adds()
     flush_mods()
   }
 
@@ -208,11 +214,11 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
       return files.find(_.name == name)
     }
 
-    def getOrCreateFile(name: String, path: Path, modtime: Long) : File = {
+    def getOrCreateFile(name: String, path: Path, modTime: Long) : File = {
       return files.find(_.name == name) match {
         case Some(x) => x
         case None    => 
-          val file = new File(this, name, path, modtime)
+          val file = new File(this, name, path, modTime)
           files.add(file)
           file
       }
@@ -250,7 +256,7 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
         path = path.resolve(splits(i))
         dir  = dir.getOrCreateSubDir(path, splits(i))
       }
-      dir.getOrCreateFile(splits(splits.length - 1), path, file.modtime)
+      dir.getOrCreateFile(splits(splits.length - 1), path, file.modTime)
     }
   }
 
@@ -313,15 +319,15 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
         }
       } else {
         if (isSupportedExtension(subpath)) {
-          val modtime  = subpath.toFile().lastModified()
+          val modTime  = subpath.toFile().lastModified()
           dir.tryGetFile(filename) match {
             case Some(file) => 
-              if (file.updateModTime(modtime)) {
+              if (file.updateModTime(modTime)) {
                 queue_mod(file)
               }
               fileset.remove(file)
             case None       => 
-              var file = dir.getOrCreateFile(filename, subpath, modtime)
+              var file = dir.getOrCreateFile(filename, subpath, modTime)
               queue_add(file)
           }
         }

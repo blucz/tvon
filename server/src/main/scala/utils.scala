@@ -59,3 +59,4 @@ class IteratorWrapper[A](iter:java.util.Iterator[A]) {
 object Hex {
   def valueOf(buf: Array[Byte]): String = buf.map("%02X" format _).mkString
 }
+

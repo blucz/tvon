@@ -5,7 +5,7 @@ import scala.io._
 import org.json4s._
 import org.json4s.native.JsonMethods._
 
-case class DirectoryConfig(name: String, path: String)
+case class DirectoryConfig(id: String, name: String, path: String)
 case class Config(
   datapath:    String,
   port:        Int, 

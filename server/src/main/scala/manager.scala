@@ -2,19 +2,12 @@ package tvon.server
 
 import scala.actors.Actor
 import scala.actors.Actor._
-
-class Database {
-}
-
-object Manager {
-    case object Init
-    case object Shutdown
-    case class  Post(action: Unit => Unit)
-}
+import java.nio.file._
 
 class Manager(config: Config) extends Actor {
     var backends   = List[StorageBackend]()
-    val db         = new Database()
+    val db         = new Database(Paths.get(config.datapath).resolve("tvon.db").toString())
+    val collection = new Collection(this)
     val extensions = List(".avi", ".mkv", ".mp4")
 
     //
@@ -27,35 +20,21 @@ class Manager(config: Config) extends Actor {
     //
     // Private implementations (properly serialized)
     //
-    private def ev_filesadded(files: List[StorageFile]) {
-        for (file <- files) {
-          Log.info(s"[manager] add file ${file.path}")
-        }
-    }
+    private def ev_filesadded   (backend: StorageBackend, files: List[StorageFile]) { collection.notifyFilesAdded(backend, files)    }
+    private def ev_filesremoved (backend: StorageBackend, files: List[StorageFile]) { collection.notifyFilesRemoved(backend, files)  }
+    private def ev_filesmodified(backend: StorageBackend, files: List[StorageFile]) { collection.notifyFilesModified(backend, files) }
+    private def ev_online (backend: StorageBackend) { collection.notifyOnline(backend)  }
+    private def ev_offline(backend: StorageBackend) { collection.notifyOffline(backend) }
 
-    private def ev_filesremoved(files: List[StorageFile]) {
-        for (file <- files) {
-          Log.info(s"[manager] rm file ${file.path}")
-        }
-    }
-
-    private def ev_filesmodified(files: List[StorageFile]) {
-        for (file <- files) {
-          Log.info(s"[manager] mod file ${file.path}")
-        }
-    }
+    private def ev_shutdown() { exit() }
 
     private def ev_init() {
-        Log.info("initializing manager")
+        collection.load()
         for (dirconfig <- config.directories) {
           val backend = new DirectoryStorageBackend(dirconfig, extensions)
           backends = backend :: backends
-          backend.watch(List[ExistingFile](), this)
+          backend.watch(collection.getExistingFiles(backend), this)
         }
-    }
-
-    private def ev_shutdown() {
-      exit()
     }
 
     //
@@ -63,13 +42,20 @@ class Manager(config: Config) extends Actor {
     //
     def act() {
       loop { react {
-        case StorageBackend.FilesAdded(files)    => ev_filesadded(files)
-        case StorageBackend.FilesModified(files) => ev_filesmodified(files)
-        case StorageBackend.FilesRemoved(files)  => ev_filesremoved(files)
-        case Manager.Post(action)                => action()
-        case Manager.Init                        => ev_init()
-        case Manager.Shutdown                    => ev_shutdown()
+        case StorageBackend.FilesAdded(backend, files)    => ev_filesadded(backend, files)
+        case StorageBackend.FilesModified(backend, files) => ev_filesmodified(backend, files)
+        case StorageBackend.FilesRemoved(backend, files)  => ev_filesremoved(backend, files)
+        case StorageBackend.Online(backend)               => ev_online(backend)
+        case StorageBackend.Offline(backend)              => ev_offline(backend)
+        case Manager.Post(action)                         => action()
+        case Manager.Init                                 => ev_init()
+        case Manager.Shutdown                             => ev_shutdown()
       } }
     }
 }
 
+object Manager {
+    case object Init
+    case object Shutdown
+    case class  Post(action: Unit => Unit)
+}
