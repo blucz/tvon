@@ -26,7 +26,10 @@ class Manager(config: Config) extends Actor {
     private def ev_online (backend: StorageBackend) { collection.notifyOnline(backend)  }
     private def ev_offline(backend: StorageBackend) { collection.notifyOffline(backend) }
 
-    private def ev_shutdown() { exit() }
+    private def ev_shutdown() { 
+      db.close()
+      exit() 
+    }
 
     private def ev_init() {
         collection.load()

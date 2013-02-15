@@ -15,6 +15,7 @@ class Collection(val manager: Manager) {
     for (json <- manager.db.loadVideoFiles()) {
       videos(json.videoId) = new VideoFile(this, json)
     }
+    Log.info(s"[collection] loaded ${videos.size} existing files")
   }
 
   def makeVideoFileJSON(backend: StorageBackend, file: StorageFile): VideoFileJSON = {
