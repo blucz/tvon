@@ -15,8 +15,8 @@ libraryDependencies ++= Seq(
   "org.scalatra"      % "scalatra_2.10"             % "2.2.0",
   "org.eclipse.jetty" % "jetty-server"              % "9.0.0.RC0",
   "org.eclipse.jetty" % "jetty-servlet"             % "9.0.0.RC0",
-  "org.slf4j"         % "slf4j-simple"              % "1.7.2",
-  "org.slf4j"         % "slf4j-simple"              % "1.7.2",
   "org.iq80.leveldb"  % "leveldb"                   % "0.5",
-  "org.scala-lang"    % "scala-actors"              % "2.10.0"
+  "org.scala-lang"    % "scala-actors"              % "2.10.0",
+  "ch.qos.logback"    % "logback-classic"           % "1.0.9"
 )
+

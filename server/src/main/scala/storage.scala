@@ -256,7 +256,8 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
         path = path.resolve(splits(i))
         dir  = dir.getOrCreateSubDir(path, splits(i))
       }
-      dir.getOrCreateFile(splits(splits.length - 1), path, file.modTime)
+      path = path.resolve(splits.last)
+      dir.getOrCreateFile(splits.last, path, file.modTime)
     }
   }
 
@@ -285,8 +286,8 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
 
   def mkFileKey(path: Path) : String = {
     val s = path.toString()
-    if (!s.startsWith(rootpathstring + java.io.File.separatorChar)) throw new IllegalArgumentException("invalid filekey ${dirpathstring} relative to ${rootpathstring}")
-    return s.substring(rootpathstring.length + 1).replace(java.io.File.separatorChar, '/')
+    if (!s.startsWith(rootpathstring)) throw new IllegalArgumentException(s"invalid filekey ${s} relative to ${rootpathstring}")
+    s.substring(rootpathstring.length).stripPrefix("/").replace(java.io.File.separatorChar, '/')
   }
 
   def mkPath(filekey: String) : Path = {
@@ -354,6 +355,7 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
     Log.info("[dirstorage] performing initialization scan")
     scan(watcher, rootpath, rootdir, true)
     flush();
+    Log.info("[dirstorage] initialization scan complete")
 
     while (true) {
       var key : WatchKey = null
@@ -365,12 +367,12 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
 
       for (event <- key.pollEvents()) {
         if (event.kind() == OVERFLOW) {
-          Log.info("[dirstorage] overflow. rescanning")
+          Log.warning("[dirstorage] overflow. rescanning")
           scan(watcher, rootpath, rootdir, true)
           flush();
         } else {
           val dirpath = key.watchable().asInstanceOf[Path]
-          Log.info(s"[dirstorage] changes! rescanning ${dirpath}")
+          Log.trace(s"[dirstorage] changes! rescanning ${dirpath}")
           var dir     = getDir(dirpath)
           scan(watcher, dirpath, dir, false)
           flush();

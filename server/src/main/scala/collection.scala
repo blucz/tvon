@@ -53,38 +53,35 @@ class Collection(val manager: Manager) {
 
   def notifyFilesAdded(backend: StorageBackend, files: List[StorageFile]) {
     for (file <- files) {
-      Log.info(s"[collection] add file ${file.path}")
+      Log.trace(s"[collection] add file ${file.path}")
       tryFindVideo(backend.id, file.key) match {
-        case Some(videofile) =>
-          Log.warning(s"[collection] ignoring duplicate file ${file.key}")
-
-        case None            => 
-          var json  = makeVideoFileJSON(backend, file)
-          var video = new VideoFile(this, json)
-          save(video)
-          videos(video.videoId) = video
+        case Some(videofile) => Log.warning(s"[collection] ignoring duplicate file ${file.key}")
+        case None            => var video = new VideoFile(this, makeVideoFileJSON(backend, file))
+                                save(video)
+                                videos(video.videoId) = video
       }
     }
   }
 
   def notifyFilesRemoved(backend: StorageBackend, files: List[StorageFile]) {
     for (file <- files) {
-      Log.info(s"[collection] rm file ${file.path}")
+      Log.trace(s"[collection] rm file ${file.path}")
       tryFindVideo(backend.id, file.key) match {
-        case None            => 
-          Log.warning(s"[collection] missing file ${file.key}")
-          return
-
-        case Some(videofile) =>
-          videofile.deleted = true
-          save(videofile)
+        case None            => Log.warning(s"[collection] missing file ${file.key}")
+        case Some(videofile) => videofile.deleted = true
+                                save(videofile)
       }
     }
   }
 
   def notifyFilesModified(backend: StorageBackend, files: List[StorageFile]) {
     for (file <- files) {
-      Log.info(s"[collection] mod file ${file.path}")
+      Log.trace(s"[collection] mod file ${file.path}")
+      tryFindVideo(backend.id, file.key) match {
+        case None            => Log.warning(s"[collection] missing file ${file.key}")
+        case Some(videofile) => videofile.modTime = file.modTime
+                                save(videofile)
+      }
     }
   }
 }

@@ -1,0 +1,17 @@
+<configuration>
+  <conversionRule conversionWord="colorize" 
+                  converterClass="tvon.server.LogColorize" />
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <withJansi>true</withJansi>
+    <encoder>
+        <pattern>%date{HH:mm:ss.SSS} %colorize(%-5level  %msg) %n</pattern>
+    </encoder>
+  </appender>
+  <logger name="org.eclipse.jetty" level="WARN" />
+
+  <root level="ALL">
+    <appender-ref ref="STDOUT" />
+  </root>
+</configuration>
+

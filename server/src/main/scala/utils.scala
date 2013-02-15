@@ -1,19 +1,7 @@
 package tvon.server;
 
-import org.slf4j.LoggerFactory
-
 trait CancelationToken {
   def cancel() : Unit
-}
-
-object Log {
-  lazy val log = LoggerFactory.getLogger("tvon_server")
-  def debug  (s:String) { log.debug(s) }
-  def info   (s:String) { log.info(s)  }
-  def warning(s:String) { log.warn(s)  }
-  def warn   (s:String) { log.warn(s)  }
-  def error  (s:String) { log.error(s) }
-  def trace  (s:String) { log.trace(s) }
 }
 
 object ThreadPool {
@@ -59,4 +47,5 @@ class IteratorWrapper[A](iter:java.util.Iterator[A]) {
 object Hex {
   def valueOf(buf: Array[Byte]): String = buf.map("%02X" format _).mkString
 }
+
 
