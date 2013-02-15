@@ -247,7 +247,10 @@ object MetadataUtils {
       part         = part
     )
   }
+}
 
+/*
+object BasicMetadataExtractionTest {
   def main(args: Array[String]) {
     import scala.io._   
     Source.fromFile("/Users/Brian/x.txt").getLines().foreach { line =>
@@ -256,3 +259,4 @@ object MetadataUtils {
     }
   }
 }
+*/
