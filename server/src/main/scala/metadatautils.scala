@@ -228,6 +228,7 @@ object MetadataUtils {
         case _       => (filename5, None)
       }
 
+    /*
     // print for debugging
     val from          = filename0.padTo(100, ' ')
     val ptitle        = title.padTo(60, ' ')
@@ -237,6 +238,7 @@ object MetadataUtils {
     val pyear         = year.map(_.toString) getOrElse "?"
     val ppart         = part.map(_.toString) getOrElse "?"
     println(s"$from ==> title: $ptitle episode: $pepisodetitle season: $pseason episode: $pepisode year: $pyear part: $ppart")
+    */
 
     new BasicMetadata(
       title        = title,
