@@ -6,6 +6,8 @@ import java.util.Date
 
 //
 // Instances of this class should only be accessed from a single thread at a time
+// 
+// XXX: handle file moves
 //
 class Collection(val manager: Manager) {
   val videos                  = new HashMap[String,VideoFile]
@@ -29,7 +31,8 @@ class Collection(val manager: Manager) {
       season           = basic.season, 
       episodes         = basic.episodes,
       dateAdded        = new Date(),
-      deleted          = false
+      deleted          = false,
+      signature        = file.signature
     )
   }
 
@@ -45,7 +48,7 @@ class Collection(val manager: Manager) {
   // Storage Integration
   //
   def getExistingFiles(backend: StorageBackend): List[ExistingFile] = {
-    return videos.values.filter(_.storageBackendId == backend.id).map(video => new ExistingFile(video.storageKey, video.modTime)).toList
+    return videos.values.filter(v => v.storageBackendId == backend.id && !v.deleted).map(video => new ExistingFile(video.storageKey, video.modTime)).toList
   }
 
   def notifyOnline(backend: StorageBackend)  { onlineStorageBackendIds.add(backend.id)    }
@@ -53,12 +56,27 @@ class Collection(val manager: Manager) {
 
   def notifyFilesAdded(backend: StorageBackend, files: List[StorageFile]) {
     for (file <- files) {
-      Log.trace(s"[collection] add file ${file.path}")
       tryFindVideo(backend.id, file.key) match {
-        case Some(videofile) => Log.warning(s"[collection] ignoring duplicate file ${file.key}")
-        case None            => var video = new VideoFile(this, makeVideoFileJSON(backend, file))
+        case Some(video) => if (video.deleted) {
+                              Log.trace(s"[collection] file undeleted ${file.key}")
+                              video.deleted = false
+                              save(video)
+                            } else {
+                              Log.warning(s"[collection] ignoring duplicate file ${file.key}")
+                            }
+        case None        => 
+          videos.values.find(v => v.signature == file.signature && v.deleted) match {
+            case Some(video) => Log.trace(s"[collection] file moved from ${video.storageKey} => ${file.key}")
+                                video.storageBackendId = backend.id
+                                video.storageKey       = file.key
+                                video.deleted          = false
+                                save(video)
+            case None =>
+              Log.trace(s"[collection] add new file ${file.path}")
+              var video = new VideoFile(this, makeVideoFileJSON(backend, file))
                                 save(video)
                                 videos(video.videoId) = video
+          }
       }
     }
   }
@@ -80,6 +98,7 @@ class Collection(val manager: Manager) {
       tryFindVideo(backend.id, file.key) match {
         case None            => Log.warning(s"[collection] missing file ${file.key}")
         case Some(videofile) => videofile.modTime = file.modTime
+                                videofile.deleted = false
                                 save(videofile)
       }
     }
@@ -95,20 +114,22 @@ case class VideoFileJSON (
   season           : Option[Int],
   episodes         : List[Int],
   deleted          : Boolean,
-  dateAdded        : Date
+  dateAdded        : Date,
+  signature        : Option[String]
 )
 
 class VideoFile(collection: Collection, json: VideoFileJSON) {
-  val videoId          : String       = json.videoId          
-  var storageBackendId : String       = json.storageBackendId 
-  var storageKey       : String       = json.storageKey       
-  var modTime          : Long         = json.modTime          
-  var title            : String       = json.title
-  var season           : Option[Int]  = json.season           
-  var episodes         : List[Int]    = json.episodes         
-  var deleted          : Boolean      = json.deleted
-  var dateAdded        : Date         = json.dateAdded
-  def isAvailable      : Boolean      = collection.onlineStorageBackendIds.contains(storageBackendId) && !deleted
+  val videoId          : String         = json.videoId          
+  var storageBackendId : String         = json.storageBackendId 
+  var storageKey       : String         = json.storageKey       
+  var modTime          : Long           = json.modTime          
+  var title            : String         = json.title
+  var season           : Option[Int]    = json.season           
+  var episodes         : List[Int]      = json.episodes         
+  var deleted          : Boolean        = json.deleted
+  var dateAdded        : Date           = json.dateAdded
+  var signature        : Option[String] = json.signature
+  def isAvailable      : Boolean        = collection.onlineStorageBackendIds.contains(storageBackendId) && !deleted
   //def metadata         : Option[IMDBMetadataJSON] = resolveMetadata
 
   def toJSON: VideoFileJSON = {
@@ -121,7 +142,8 @@ class VideoFile(collection: Collection, json: VideoFileJSON) {
       season           = season,           
       episodes         = episodes,          
       deleted          = deleted,
-      dateAdded        = dateAdded
+      dateAdded        = dateAdded,
+      signature        = signature
     )
   }
 }
