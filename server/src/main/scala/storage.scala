@@ -4,6 +4,7 @@ import scala.actors.Actor
 import scala.actors.Actor._
 import scala.collection.mutable._
 import java.nio._
+import java.util.concurrent.TimeUnit
 import java.nio.file._
 import java.nio.file.StandardWatchEventKinds._
 import scala.collection.JavaConversions._
@@ -13,7 +14,7 @@ trait StorageFile {
   def path      : Path   
   def modTime   : Long
   def length    : Option[Long]
-  def signature : Option[Array[Byte]]
+  def signature : Option[String]
 }
 
 case class ExistingFile(key: String, modTime: Long)
@@ -56,12 +57,12 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
 
   class File(var dir: Dir, var name: String, var path: Path, var modTime: Long) extends StorageFile {
     var cached           : Boolean             = false
-    var cached_signature : Option[Array[Byte]] = None
+    var cached_signature : Option[String]      = None
     var cached_length    : Option[Long]        = None
 
     def key       : String                = mkFileKey(path)
     def length    : Option[Long]          = { cached_length    }
-    def signature : Option[Array[Byte]]   = { cached_signature }
+    def signature : Option[String]        = { cached_signature }
 
     def ensureCached() {
       if (!cached) {
@@ -79,7 +80,7 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
             channel.read(buf)
             buf.putLong(len)
             val sha1 = MessageDigest.getInstance("SHA-1");
-            cached_signature = Some(sha1.digest(buf.array()))
+            cached_signature = Some(Hex.valueOf(sha1.digest(buf.array())))
           } else {
             val buf = ByteBuffer.allocate(chunk_size * 3 + 8)
             channel.position(0)
@@ -94,7 +95,7 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
             buf.limit(buf.capacity())
             buf.putLong(len)
             val sha1 = MessageDigest.getInstance("SHA-1");
-            cached_signature = Some(sha1.digest(buf.array()))
+            cached_signature = Some(Hex.valueOf(sha1.digest(buf.array())))
           }
           cached_length    = Some(len)
 
@@ -137,17 +138,23 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
     }
   }
 
+  private def queue_mod(file: File) { 
+    try {
+      file.ensureCached()
+      pending_mods.append(file)
+      if (pending_mods.size() >= 100) {
+        flush_mods()
+      }
+    } catch {
+      case e:Throwable => Log.error(s"[dirstorage] error caching file data: ${e}")
+      e.printStackTrace
+    }
+  }
+
   private def queue_remove(file: File) { 
     pending_removes.append(file) 
     if (pending_removes.size() >= 100) {
       flush_removes()
-    }
-  }
-
-  private def queue_mod(file: File) { 
-    pending_mods.append(file)    
-    if (pending_mods.size() >= 100) {
-      flush_mods()
     }
   }
 
@@ -357,28 +364,45 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
     flush();
     Log.info("[dirstorage] initialization scan complete")
 
+    val pending_paths = new HashSet[Path]()
+    var overflow      = false
+
     while (true) {
       var key : WatchKey = null
       try {
-        key = watcher.take()
+        key = watcher.poll(2, TimeUnit.SECONDS)
       } catch {
         case e:InterruptedException => return
       }
 
-      for (event <- key.pollEvents()) {
-        if (event.kind() == OVERFLOW) {
-          Log.warning("[dirstorage] overflow. rescanning")
+      if (key == null) { // no activity in 2s; flush!
+        if (overflow) {
+          Log.warning(s"[dirstorage] performing scan of ${rootpath} due to overflow")
           scan(watcher, rootpath, rootdir, true)
           flush();
         } else {
-          val dirpath = key.watchable().asInstanceOf[Path]
-          Log.trace(s"[dirstorage] changes! rescanning ${dirpath}")
-          var dir     = getDir(dirpath)
-          scan(watcher, dirpath, dir, false)
+          for (dirpath <- pending_paths) {
+              Log.trace(s"[dirstorage] scanning ${dirpath}")
+              var dir     = getDir(dirpath)
+              scan(watcher, dirpath, dir, false)
+          }
           flush();
         }
+        pending_paths.clear()
+        overflow = false
+      } else {
+        val events = key.pollEvents()
+        if (events.exists(_.kind() == OVERFLOW)) {
+          overflow = true
+        } else {
+          for (event <- events) {
+            val dirpath = key.watchable().asInstanceOf[Path]
+            pending_paths.add(dirpath)
+            //Log.trace(s"[dirstorage] enqueueing scan for ${dirpath}")
+          }
+        }
+        key.reset()
       }
-      key.reset()
     }
   }
 }
