@@ -14,8 +14,9 @@ class Database(datapath: String) extends AutoCloseable {
   val options = new Options;
   options.createIfMissing(true);
 
-  val KEYSPACE_VIDEOFILE : Byte = 1
-  val KEYSPACE_IMDB      : Byte = 2
+  val KEYSPACE_VIDEOFILE        : Byte = 1
+  val KEYSPACE_IMDBMETADATA     : Byte = 2
+  val KEYSPACE_PROFILE          : Byte = 3
 
   val db = factory.open(new File(datapath), options);
 
@@ -33,6 +34,10 @@ class Database(datapath: String) extends AutoCloseable {
     db.put(mkKey(keyspace, key), bytes(Serialization.write(value)))
   }
 
+  private def delete(keyspace: Byte, key: String) {
+    db.delete(mkKey(keyspace, key))
+  }
+
   private def get[A <: AnyRef] (keyspace: Byte, key: String) (implicit m:Manifest[A]) : Option[A] = { 
     db.get(mkKey(keyspace, key)) match {
       case null => None
@@ -40,28 +45,54 @@ class Database(datapath: String) extends AutoCloseable {
     }
   }
 
-  def putImdbMetadata(metadata: IMDBMetadataJSON) {
-    put(KEYSPACE_IMDB, metadata.imdb_id, metadata)
+  private def getAll[A](keyspace: Byte) (implicit m:Manifest[A]): List[A] = {
+    val iterator = db.iterator
+    iterator.seek(Array[Byte](keyspace))
+    var ret = List[A]()
+    while (iterator.hasNext && iterator.peekNext.getKey()(0) == keyspace) {
+      ret = parse(asString(iterator.peekNext.getValue)).extract[A] :: ret
+      iterator.next
+    }
+    ret
   }
-  def tryGetImdbMetadata(imdbId: String): Option[IMDBMetadataJSON] = {
-    get[IMDBMetadataJSON](KEYSPACE_IMDB, imdbId)
+
+  def putIMDBMetadata(metadata: IMDBMetadataJSON) {
+    put(KEYSPACE_IMDBMETADATA, metadata.imdb_id, metadata)
   }
+  def tryGetIMDBMetadata(imdbId: String): Option[IMDBMetadataJSON] = {
+    get[IMDBMetadataJSON](KEYSPACE_IMDBMETADATA, imdbId)
+  }
+  def loadIMDBMetadata(): List[IMDBMetadataJSON] = {
+    getAll[IMDBMetadataJSON](KEYSPACE_IMDBMETADATA)
+  }
+  def deleteIMDBMetadata(imdbId: String) {
+    delete(KEYSPACE_IMDBMETADATA, imdbId)
+  }
+
   def tryGetVideoFile(videoId: String): Option[VideoFileJSON] = {
     get[VideoFileJSON](KEYSPACE_VIDEOFILE, videoId)
   }
   def putVideoFile(videoFile: VideoFileJSON) {
     put(KEYSPACE_VIDEOFILE, videoFile.videoId, videoFile)
   }
-
   def loadVideoFiles(): List[VideoFileJSON] = {
-    val iterator = db.iterator
-    iterator.seek(Array[Byte](KEYSPACE_VIDEOFILE))
-    var ret = List[VideoFileJSON]()
-    while (iterator.hasNext && iterator.peekNext.getKey()(0) == KEYSPACE_VIDEOFILE) {
-      ret = parse(asString(iterator.peekNext.getValue)).extract[VideoFileJSON] :: ret
-      iterator.next
-    }
-    ret
+    getAll[VideoFileJSON](KEYSPACE_VIDEOFILE)
+  }
+  def deleteVideoFile(videoId: String) {
+    delete(KEYSPACE_VIDEOFILE, videoId)
+  }
+
+  def tryGetProfile(profileId: String): Option[ProfileJSON] = {
+    get[ProfileJSON](KEYSPACE_PROFILE, profileId)
+  }
+  def putProfile(profile: ProfileJSON) {
+    put(KEYSPACE_PROFILE, profile.profileId, profile)
+  }
+  def loadProfiles(): List[ProfileJSON] = {
+    getAll[ProfileJSON](KEYSPACE_PROFILE)
+  }
+  def deleteProfile(profileId: String) {
+    delete(KEYSPACE_PROFILE, profileId)
   }
 
   def close() {

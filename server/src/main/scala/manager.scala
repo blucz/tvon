@@ -9,6 +9,7 @@ class Manager(config: Config) extends Actor {
     val db         = new Database(Paths.get(config.datapath).resolve("tvon.db").toString())
     val collection = new Collection(this)
     val extensions = List(".avi", ".mkv", ".mp4")
+    val profiles   = new Profiles(this)
 
     //
     // Public API, threadsafe
