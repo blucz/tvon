@@ -7,7 +7,7 @@ case class IMDBEpisodeJSON(
   val date             : String
 )
 
-case class IMDBMetadataJSON(
+case class DatabaseIMDBMetadata(
   val imdb_id          : String,
   val writers          : List[String],
   val actors           : List[String],

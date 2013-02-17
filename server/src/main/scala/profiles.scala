@@ -1,19 +1,24 @@
 package tvon.server;
 
 import scala.collection.mutable._
-import java.util.UUID
 
-case class ProfileJSON(
+case class DatabaseProfile(
   profileId : String,
   name      : String
 )
 
-class Profile(profiles: Profiles, json: ProfileJSON) {
+class Profile(profiles: Profiles, json: DatabaseProfile) {
   val profileId : String = json.profileId
   var name      : String = json.name
 
-  def toJSON: ProfileJSON = {
-    ProfileJSON(
+  def toDatabase: DatabaseProfile = {
+    DatabaseProfile(
+      profileId   = profileId,
+      name        = name
+    )
+  }
+  def toApi: ApiProfile = {
+    ApiProfile(
       profileId   = profileId,
       name        = name
     )
@@ -24,7 +29,7 @@ class Profiles(val manager: Manager) {
   val profiles = new HashMap[String,Profile]
 
   private def save(profile: Profile) {
-    manager.db.putProfile(profile.toJSON)
+    manager.db.putProfile(profile.toDatabase)
   }
 
   def edit(profile: Profile, name: String) {
@@ -33,13 +38,14 @@ class Profiles(val manager: Manager) {
   }
 
   def create(name: String): Profile = {
-    val profile = new Profile(this, new ProfileJSON(profileId = UUID.randomUUID.toString, name = name))
+    val profile = new Profile(this, new DatabaseProfile(profileId = Utils.newGuid, name = name))
     save(profile)
     profiles(profile.profileId) = profile
     profile
   }
 
   def delete(profile: Profile) {
+    profiles.remove(profile.profileId)
     manager.db.deleteProfile(profile.profileId)
   }
 
@@ -50,4 +56,11 @@ class Profiles(val manager: Manager) {
   }
 }
 
+case class ApiProfile(
+  profileId : String,
+  name      : String
+)
 
+case class ApiProfileList (
+  profiles: List[ApiProfile]
+)

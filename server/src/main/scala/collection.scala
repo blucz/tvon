@@ -1,7 +1,6 @@
 package tvon.server
 
 import scala.collection.mutable._
-import java.util.UUID
 import java.util.Date
 
 //
@@ -20,10 +19,10 @@ class Collection(val manager: Manager) {
     Log.info(s"[collection] loaded ${videos.size} existing files")
   }
 
-  def makeVideoFileJSON(backend: StorageBackend, file: StorageFile): VideoFileJSON = {
+  def makeDatabaseVideoFile(backend: StorageBackend, file: StorageFile): DatabaseVideoFile = {
     val basic = MetadataUtils.extractBasicMetadata(file.path.getFileName().toString())
-    new VideoFileJSON(
-      videoId          = UUID.randomUUID.toString,
+    new DatabaseVideoFile(
+      videoId          = Utils.newGuid,
       storageBackendId = backend.id,
       storageKey       = file.key,
       modTime          = file.modTime,
@@ -37,7 +36,7 @@ class Collection(val manager: Manager) {
   }
 
   def save(file: VideoFile) {
-    manager.db.putVideoFile(file.toJSON)
+    manager.db.putVideoFile(file.toDatabase)
   }
 
   def tryFindVideo(storageBackendId: String, storageKey: String): Option[VideoFile] = {
@@ -73,7 +72,7 @@ class Collection(val manager: Manager) {
                                 save(video)
             case None =>
               Log.trace(s"[collection] add new file ${file.path}")
-              var video = new VideoFile(this, makeVideoFileJSON(backend, file))
+              var video = new VideoFile(this, makeDatabaseVideoFile(backend, file))
                                 save(video)
                                 videos(video.videoId) = video
           }
@@ -105,7 +104,7 @@ class Collection(val manager: Manager) {
   }
 }
 
-case class VideoFileJSON (
+case class DatabaseVideoFile (
   videoId          : String,
   storageBackendId : String,
   storageKey       : String,
@@ -118,7 +117,20 @@ case class VideoFileJSON (
   signature        : Option[String]
 )
 
-class VideoFile(collection: Collection, json: VideoFileJSON) {
+case class ApiVideoFile (
+  videoId          : String,
+  title            : String,    
+  season           : Option[Int],
+  episodes         : List[Int],
+  available        : Boolean,
+  dateAdded        : Date
+)
+
+case class ApiVideoList (
+  videos: List[ApiVideoFile]
+)
+
+class VideoFile(collection: Collection, json: DatabaseVideoFile) {
   val videoId          : String         = json.videoId          
   var storageBackendId : String         = json.storageBackendId 
   var storageKey       : String         = json.storageKey       
@@ -129,11 +141,11 @@ class VideoFile(collection: Collection, json: VideoFileJSON) {
   var deleted          : Boolean        = json.deleted
   var dateAdded        : Date           = json.dateAdded
   var signature        : Option[String] = json.signature
-  def isAvailable      : Boolean        = collection.onlineStorageBackendIds.contains(storageBackendId) && !deleted
-  //def metadata         : Option[IMDBMetadataJSON] = resolveMetadata
+  def available        : Boolean        = collection.onlineStorageBackendIds.contains(storageBackendId) && !deleted
+  //def metadata         : Option[DatabaseIMDBMetadata] = resolveMetadata
 
-  def toJSON: VideoFileJSON = {
-    new VideoFileJSON(
+  def toDatabase: DatabaseVideoFile = {
+    new DatabaseVideoFile(
       videoId          = videoId,
       storageBackendId = storageBackendId,
       storageKey       = storageKey,      
@@ -144,6 +156,17 @@ class VideoFile(collection: Collection, json: VideoFileJSON) {
       deleted          = deleted,
       dateAdded        = dateAdded,
       signature        = signature
+    )
+  }
+
+  def toApi: ApiVideoFile = {
+    new ApiVideoFile(
+      videoId          = videoId,
+      title            = title,
+      season           = season,           
+      episodes         = episodes,          
+      available        = available,
+      dateAdded        = dateAdded
     )
   }
 }

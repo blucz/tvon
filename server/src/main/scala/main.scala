@@ -13,13 +13,15 @@ object App extends {
         val manager = new Manager(config)
         manager.initialize()
 
-        val server = new ApiServer(manager = manager, port = config.port)
+        val server = new WebServer(manager = manager, webroot = config.webroot, port = config.port)
         server.start()
+
         Log.info("==============================================")
         Log.info("Press enter to exit server")
         Log.info("==============================================")
         readLine()
         Log.info("Exiting...")
+
         manager.shutdown()
         server.stop()
     }

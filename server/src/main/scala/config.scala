@@ -8,6 +8,7 @@ import org.json4s.native.JsonMethods._
 case class DirectoryConfig(id: String, name: String, path: String)
 case class Config(
   datapath:    String,
+  webroot:     String,
   port:        Int, 
   directories: List[DirectoryConfig]
 )

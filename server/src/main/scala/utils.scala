@@ -1,7 +1,13 @@
 package tvon.server;
 
+import java.util.UUID
+
 trait CancelationToken {
   def cancel() : Unit
+}
+
+object Utils {
+  def newGuid(): String = UUID.randomUUID.toString.replace("-", "")
 }
 
 object ThreadPool {

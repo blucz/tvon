@@ -1,6 +1,7 @@
 {
     "datapath": "data",
-    "port": 8000,
+    "port":     8000,
+    "webroot":  "webui",
     "directories": [
         { "id": "1", "name": "Movies", "path": "/Users/Brian/Movies" }
     ]

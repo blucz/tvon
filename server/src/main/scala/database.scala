@@ -56,40 +56,40 @@ class Database(datapath: String) extends AutoCloseable {
     ret
   }
 
-  def putIMDBMetadata(metadata: IMDBMetadataJSON) {
+  def putIMDBMetadata(metadata: DatabaseIMDBMetadata) {
     put(KEYSPACE_IMDBMETADATA, metadata.imdb_id, metadata)
   }
-  def tryGetIMDBMetadata(imdbId: String): Option[IMDBMetadataJSON] = {
-    get[IMDBMetadataJSON](KEYSPACE_IMDBMETADATA, imdbId)
+  def tryGetIMDBMetadata(imdbId: String): Option[DatabaseIMDBMetadata] = {
+    get[DatabaseIMDBMetadata](KEYSPACE_IMDBMETADATA, imdbId)
   }
-  def loadIMDBMetadata(): List[IMDBMetadataJSON] = {
-    getAll[IMDBMetadataJSON](KEYSPACE_IMDBMETADATA)
+  def loadIMDBMetadata(): List[DatabaseIMDBMetadata] = {
+    getAll[DatabaseIMDBMetadata](KEYSPACE_IMDBMETADATA)
   }
   def deleteIMDBMetadata(imdbId: String) {
     delete(KEYSPACE_IMDBMETADATA, imdbId)
   }
 
-  def tryGetVideoFile(videoId: String): Option[VideoFileJSON] = {
-    get[VideoFileJSON](KEYSPACE_VIDEOFILE, videoId)
+  def tryGetVideoFile(videoId: String): Option[DatabaseVideoFile] = {
+    get[DatabaseVideoFile](KEYSPACE_VIDEOFILE, videoId)
   }
-  def putVideoFile(videoFile: VideoFileJSON) {
+  def putVideoFile(videoFile: DatabaseVideoFile) {
     put(KEYSPACE_VIDEOFILE, videoFile.videoId, videoFile)
   }
-  def loadVideoFiles(): List[VideoFileJSON] = {
-    getAll[VideoFileJSON](KEYSPACE_VIDEOFILE)
+  def loadVideoFiles(): List[DatabaseVideoFile] = {
+    getAll[DatabaseVideoFile](KEYSPACE_VIDEOFILE)
   }
   def deleteVideoFile(videoId: String) {
     delete(KEYSPACE_VIDEOFILE, videoId)
   }
 
-  def tryGetProfile(profileId: String): Option[ProfileJSON] = {
-    get[ProfileJSON](KEYSPACE_PROFILE, profileId)
+  def tryGetProfile(profileId: String): Option[DatabaseProfile] = {
+    get[DatabaseProfile](KEYSPACE_PROFILE, profileId)
   }
-  def putProfile(profile: ProfileJSON) {
+  def putProfile(profile: DatabaseProfile) {
     put(KEYSPACE_PROFILE, profile.profileId, profile)
   }
-  def loadProfiles(): List[ProfileJSON] = {
-    getAll[ProfileJSON](KEYSPACE_PROFILE)
+  def loadProfiles(): List[DatabaseProfile] = {
+    getAll[DatabaseProfile](KEYSPACE_PROFILE)
   }
   def deleteProfile(profileId: String) {
     delete(KEYSPACE_PROFILE, profileId)
