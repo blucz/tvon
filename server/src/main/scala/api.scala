@@ -56,7 +56,7 @@ class WebServlet(manager: Manager, webroot: String) extends ScalatraServlet {
     setJson()
     params.get("name") match {
       case Some(name) => 
-        if (profiles.profiles.values.exists(_.name == name)) {
+        if (profiles.profiles.values.exists(_.name.toLowerCase() == name.toLowerCase())) {
           errorResponse("duplicate")
         } else {
           val profile = profiles.create(name)
@@ -69,6 +69,11 @@ class WebServlet(manager: Manager, webroot: String) extends ScalatraServlet {
   post("/api/profiles/delete") {
     setJson()
     params.get("id") match {
+      case Some("all") =>
+        for (p <- profiles.profiles.values.toList) {
+          profiles.delete(p)
+          emptyResponse()
+        }
       case Some(id) =>
         profiles.profiles.get(id) match {
           case Some(profile) => profiles.delete(profile)
@@ -86,7 +91,7 @@ class WebServlet(manager: Manager, webroot: String) extends ScalatraServlet {
       case (Some(name),Some(id)) => 
         profiles.profiles.get(id) match {
           case Some(profile) => 
-            if (profiles.profiles.values.exists(p => p.name == name && p.profileId != id)) {
+            if (profiles.profiles.values.exists(p => p.name.toLowerCase() == name.toLowerCase() && p.profileId != id)) {
               errorResponse("duplicate")
             } else {
               profiles.edit(profile, name)

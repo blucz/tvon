@@ -47,6 +47,7 @@ function AddProfileController($scope, $rootScope) {
     $scope.name = ""
     $scope.create = function(name, cb) {
         cb()
+        $scope.name = ""
         $.ajax(POST("/api/profiles/create", { name: name })).done(function(data) {
             if (data.status == "success") {
                 $rootScope.$apply(function() {
