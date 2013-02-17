@@ -33,12 +33,13 @@ class Manager(config: Config) extends Actor {
     }
 
     private def ev_init() {
-        collection.load()
-        for (dirconfig <- config.directories) {
-          val backend = new DirectoryStorageBackend(dirconfig, extensions)
-          backends = backend :: backends
-          backend.watch(collection.getExistingFiles(backend), this)
-        }
+      profiles.load()
+      collection.load()
+      for (dirconfig <- config.directories) {
+        val backend = new DirectoryStorageBackend(dirconfig, extensions)
+        backends = backend :: backends
+        backend.watch(collection.getExistingFiles(backend), this)
+      }
     }
 
     //

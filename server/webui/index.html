@@ -1,16 +1,59 @@
 <!doctype html>
-<html ng-app>
+<html ng-app='tvon.app'>
     <head>
         <title>TVon</title>
         <link href="css/style.css" rel="stylesheet" type="text/css" />
-        <link href="css/dark-hive/jquery-ui-1.10.1.custom.css" rel="stylesheet" />
+        <link href="css/smoothness/jquery-ui-1.10.1.custom.css" rel="stylesheet" />
         <link rel="icon" type="image/x-icon" href="/webui/favicon.ico" />
         <script src="js/jquery-1.9.1.min.js"></script>
-        <script src="js/angular.min.js"></script>
+        <script src="js/jqModal.js"></script>
         <script src="js/jquery-ui-1.10.1.custom.min.js"></script>
+        <script src="js/angular.min.js"></script>
+        <script src="js/tvon_utils.js"></script>
         <script src="js/tvon.js"></script>
     </head>
+
     <body>
-        TVon
+        <div id='container' ng-controller='MainController'>
+            <div id='main'>
+                <div id='tabs' class='flex'>
+                    <ul>
+                        <li><a href='#tab_browse'>Browse</a></li>
+                        <li><a href='#tab_control'>Control</a></li>
+                    </ul>
+                    <div id='tab_browse'>
+                        <ng-include src='"browse.html"'></ng-include>
+                    </div>
+                    <div id='tab_control'>
+                        <ng-include src='"control.html"'></ng-include>
+                    </div>
+                </div>
+            </div>
+            <div id='footer'>
+                <div class='item' id='profilepicker'>
+                    <div class='title'>
+                        Profile: 
+                    </div>
+                    <select ng-options="p.name for p in profiles" ng-model="profile"></select>
+                    <div class='add'>
+                        <a open-dialog='dialog_addprofile'>[+]</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <centered-dialog id='dialog_addprofile' dialog-title="Create Profile" dialog-height="30%">
+            <form ng-controller='AddProfileController'>
+                <div class='vbox'>
+                    <div class='hbox aligncenter packstart'>
+                        <div class='label'>Name:</div>
+                        <input type="text" size='40' ng-model="name" />
+                    </div>
+                </div>
+                <div class='hbox packend aligncenter'>
+                    <button class='createbutton' ng-click='create(name, dialog_close)'>Create</button>
+                </div>
+            </div>
+        </centered-dialog>
     </body>
 </html>

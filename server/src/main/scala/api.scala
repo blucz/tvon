@@ -182,8 +182,8 @@ object ApiHelpers {
 
   case class ApiEmpty()
   lazy val empty = new ApiEmpty()
-  def errorResponse(s: String) = new ApiResponse(s,         empty).toResponseJson
-  def emptyResponse()          = new ApiResponse("success", empty).toResponseJson
+  def errorResponse(s: String) = new ApiResponse(s,         empty).toJson
+  def emptyResponse()          = new ApiResponse("success", empty).toJson
 }
 
 //
