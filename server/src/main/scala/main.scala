@@ -16,16 +16,15 @@ object App extends {
         }
 
         trait ConfigComponentImpl extends ConfigComponent { val config = appconfig }
-        class AppInstance extends Lifecycle
-                             with ConfigComponentImpl
-                             with WebServerComponent
-                             with StorageComponent
-                             with BrowserComponent
-                             with CollectionComponent
-                             with ProfilesComponent
-                             with LevelDbDatabaseComponent
-        val app = new AppInstance
-
+        var app = new  Lifecycle
+                  with ConfigComponentImpl
+                  with WebServerComponent
+                  with StorageComponent
+                  with BrowserComponent
+                  with CollectionComponent
+                  with ProfilesComponent
+                  with LevelDbDatabaseComponent
+ 
         Log.info("[app] initializing")
         app.init()
 
