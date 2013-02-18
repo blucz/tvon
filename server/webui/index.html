@@ -15,19 +15,7 @@
 
     <body>
         <div id='container' ng-controller='MainController'>
-            <div id='main'>
-                <div id='tabs' class='flex'>
-                    <ul>
-                        <li><a href='#tab_browse'>Browse</a></li>
-                        <li><a href='#tab_control'>Control</a></li>
-                    </ul>
-                    <ng-include src='"browse.html"'></ng-include>
-                    <div id='tab_control'>
-                        <ng-include src='"control.html"'></ng-include>
-                    </div>
-                </div>
-            </div>
-            <div id='footer'>
+            <div id='header'>
                 <div class='item' id='profilepicker'>
                     <div class='title'>
                         Profile: 
@@ -37,6 +25,9 @@
                         <a open-dialog='dialog_addprofile'>[+]</a>
                     </div>
                 </div>
+            </div>
+            <div id='main'>
+                <ng-include src='"browse.html"'></ng-include>
             </div>
         </div>
 

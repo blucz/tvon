@@ -1,15 +1,31 @@
-<div ng-controller='BrowseController' id='tab_browse' class='vbox'>
+<div ng-controller='BrowseController' id='browse' class='vbox'>
     <div class='flex' id='browse_list'>
-        <div>
-            {{level.item.title}}
+        <div class='header'>
+            <div class='breadcrumbs hbox'>
+                <div class='breadcrumb hbox' ng-repeat='level in levels' ng-click='popto(level)'>
+                    <div class='sep' ng-show='level != levels[0]'> &gt;</div>
+                    <div class='text'>{{level.item.title}}</div>
+                </div>
+            </div>
         </div>
-        <div ng-click='pop()' ng-show='can_back'>Go Back</div>
 
-        <div ng-show='!level.exists'>
-            No results found
+        <div class='browseitem' ng-click='pop()' ng-show='can_back'>
+            <div class='title'>
+                &lt;&lt; Go Back
+            </div>
         </div>
 
-        <div ng-show='level.exists' ng-repeat='item in level.subitems' class='browseitem' ng-click='browse(item.path)'>
+        <div ng-show='!level.exists' class='browseitem'>
+            <div class='title'>
+                No results found
+            </div>
+        </div>
+
+        <div ng-show='level.is_loading' class='loading'>
+            Loading...
+        </div>
+
+        <div ng-show='level.exists' ng-repeat='item in level.items' class='browseitem' ng-click='browse(item, item.path)'>
             <div class='title'>
                 {{item.title}}
             </div>

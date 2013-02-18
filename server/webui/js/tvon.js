@@ -23,47 +23,46 @@ app.run(["$rootScope", function($rootScope) {
             loadProfiles(data.value.profiles)
         })
     })
-
-    $("#tabs").tabs()
 }])
 
 function BrowseController($scope, $rootScope) {
-    $scope.levels        = [{exists:false}]
-    $scope.level         = $scope.levels[$scope.levels.length-1]
+    $scope.levels           = []
 
     function refresh() {
-        if ($scope.levels.length == 0) $scope.levels.push({exists:false})
         $scope.level    = $scope.levels[$scope.levels.length-1]
-        $scope.can_back = $scope.levels.length > 1
+        $scope.can_back = $scope.levels.length > 1 
     }
 
-    $scope.browse = function(path) {
+    $scope.browse = function(item, path) {
         var data = {}
+        var level = { is_loading: true, exists: false, item: item } 
+        $scope.levels.push(level)
         if ($rootScope.profile != undefined) data.profileId = $rootScope.profile.profileId
         if ($rootScope.screen  != undefined) data.screenId  = $rootScope.screen.screenId
         $.ajax(GET("/api/browse/" + path, data)).done(function(data) {
             $scope.$apply(function(){ 
+                $scope.level.is_loading = false
                 if (data.status == "success") {
-                    while ($scope.levels.length > 0 && !$scope.levels[$scope.levels.length-1].exists) {
-                        $scope.levels.pop()
-                    }
-                    data.value.exists = true
-                    $scope.levels.push(data.value)
-                } else {
-                    if ($scope.level.exists) {
-                        $scope.levels.push({exists:false})
-                    }
+                    $scope.level.exists = true
+                    $scope.level.items = data.value.items
                 }
                 refresh();
             })
         })
+        refresh()
     }
     $scope.pop = function() {
         $scope.levels.pop()
         refresh()
     }
+    $scope.popto = function(level) {
+        while ($scope.level != level) {
+            $scope.levels.pop()
+            refresh()
+        }
+    }
 
-    $scope.browse('')
+    $scope.browse({ title: 'Browse'}, '')
     refresh();
 }
 

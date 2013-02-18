@@ -62,7 +62,9 @@ object MetadataUtils {
   lazy val seasonEpisode = List(
     """(?:^|[^\d])(\d+)x(\d+)(?:$|[^\d])""",       // 02x03, 2x3, etc
     """(?:^|[^\d])(\d+)x(\d+)(?:$|[^\d])""",       // 02x03, 2x3, etc
-    """s(\d+) ?e(\d+)""",                          // S04E02, S4E3, S04E02, S04 E02, etc.
+    """s(\d+)e(\d+)""",                            // S04E02, S4E3, S04E02, etc.
+    """s(\d+) e(\d+)""",                           // S04 E02, etc.
+    """s(\d+)-e(\d+)""",                           // S04-E02, etc.
     """(?:^|[^\d])(\d)(\d\d)(?:$|[^\d])""",        // 102
     """(?:^|[^\d])(0\d)(\d\d)(?:$|[^\d])""",       // 0102
     """season (\d+),? episode (\d+)""",            // season 7 episode 1
@@ -77,7 +79,9 @@ object MetadataUtils {
   // Probably need more patterns here, but having trouble finding more examples of multi-episode conventions
   //
   lazy val seasonMultiEpisode = List(
-    """s(\d+) ?e(\d+) ?e(\d+)"""                           // S04E02, S4E3, S04E02, S04 E02, etc.
+    """s(\d+)e(\d+) ?e(\d+)""",                          
+    """s(\d+) e(\d+) ?e(\d+)""",                          
+    """s(\d+)-e(\d+) ?e(\d+)"""                
   )
   lazy val bracketedSeasonMultiEpisode = seasonMultiEpisode.map("""\[""" + _ + """\]""")
   lazy val parenSeasonMultiEpisode     = seasonMultiEpisode.map("""\(""" + _ + """\)""")

@@ -7,12 +7,14 @@ body {
 a {
     text-decoration: none;
 }
+a:hover {
+    text-decoration: underline;
+}
 
 
 /* App, header, footer, etc */
 #container {
     top: 0;
-    left: 0;
     position: absolute;
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -20,19 +22,11 @@ a {
     height: 100%;
 }
 
-#header a {
-    color: #ccc;
-}
-
-#footer a {
-    color: #ccc;
-}
-
-#footer {
+#header {
     position: absolute;
-    bottom: 0px;
     left: 0px;
     right: 0px;
+    top: 0px;
     height: 30px;
     background: #2e2d2b;
     color: #eee;
@@ -42,21 +36,23 @@ a {
     -webkit-box-align: center;
 }
 
+#main {
+    position: absolute;
+    top: 30px;
+    bottom 0; left: 0; right: 0;
+    -webkit-box-flex: 1;
+    padding: 8px;
+    overflow-y: scroll;
+    overflow-x: none;
+}
+
+#header a {
+    color: #ccc;
+}
+
 #header .item {
 }
 
-#footer .item {
-}
-
-#main {
-    position: absolute;
-    top: 0px;
-    bottom: 30px;
-    left: 0px;
-    right: 0px;
-    -webkit-box-flex: 1;
-    padding: 8px;
-}
 
 /* Profiles */
 #profilepicker {
@@ -151,15 +147,6 @@ a {
     position: relative;
 }
 
-/* tabs */
-#tabs { 
-    position: absolute;
-    top: 0px;
-    left: 0px;
-    bottom: 30px;
-    right: 0px  
-}
-
 /* browsing */
 .browseitem {
     padding: 6px;
@@ -173,15 +160,28 @@ a {
 .browseitem .subtitle {
     font-size: 13pt;
 }
-#tab_browse {
-    position:relative;
-    height: 100%;
-}
-#browse_list {
-    position: absolute;
-    top: 0; bottom: 0; left: 0; right: 0;
-    overflow-y: scroll;
-    overflow-x: none;
-    bottom: 52px;
+
+#browse_list .header {
+    font-weight: bold;
+    font-size: 15pt;
+    width: 100%;
+    border-bottom: 1px solid #666;
 }
 
+#browse_list .breadcrumbs {
+    
+}
+
+#browse_list .breadcrumb .sep {
+    padding: 4px;
+    padding-right: 8px;
+}
+#browse_list .breadcrumb .text {
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+#browse_list .loading {
+    font-color: #999;
+    font-style: italic;
+}

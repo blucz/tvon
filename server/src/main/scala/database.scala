@@ -9,9 +9,23 @@ import org.iq80.leveldb.impl.Iq80DBFactory._
 
 import java.io._
 import java.nio._
+import java.nio.file._
 
-class Database(datapath: String) extends AutoCloseable {
-  val options = new Options;
+trait Database extends AutoCloseable { }
+
+trait LevelDbDatabaseComponent extends IMDBDatabaseComponent 
+                                  with ProfileDatabaseComponent 
+                                  with CollectionDatabaseComponent
+                                  with BrowseKeyDatabaseComponent { 
+  this: ConfigComponent =>
+  val db = new LevelDbDatabase(Paths.get(config.datapath).resolve("tvon.db").toString())
+}
+
+class LevelDbDatabase(datapath: String) extends Database with ProfileDatabase 
+                                                         with IMDBDatabase 
+                                                         with BrowseKeyDatabase 
+                                                         with CollectionDatabase {
+  val options  = new Options;
   options.createIfMissing(true);
 
   val KEYSPACE_VIDEOFILE        : Byte = 1
@@ -20,7 +34,7 @@ class Database(datapath: String) extends AutoCloseable {
   val KEYSPACE_KEY_TO_STRING    : Byte = 4
   val KEYSPACE_STRING_TO_KEY    : Byte = 5
 
-  val db = factory.open(new File(datapath), options);
+  val leveldb = factory.open(new File(datapath), options);
 
   implicit val formats = Serialization.formats(NoTypeHints)
 
@@ -33,33 +47,33 @@ class Database(datapath: String) extends AutoCloseable {
   }
 
   private def putString(keyspace: Byte, key: String, value: String) = {
-    db.put(mkKey(keyspace, key), bytes(value))
+    leveldb.put(mkKey(keyspace, key), bytes(value))
   }
 
   private def getString(keyspace: Byte, key: String): Option[String] = {
-    db.get(mkKey(keyspace, key)) match {
+    leveldb.get(mkKey(keyspace, key)) match {
       case null => None
       case bs   => Some(asString(bs))
     }
   }
 
   private def put[A <: AnyRef](keyspace: Byte, key: String, value: A) = {
-    db.put(mkKey(keyspace, key), bytes(Serialization.write(value)))
+    leveldb.put(mkKey(keyspace, key), bytes(Serialization.write(value)))
   }
 
   private def delete(keyspace: Byte, key: String) {
-    db.delete(mkKey(keyspace, key))
+    leveldb.delete(mkKey(keyspace, key))
   }
 
   private def get[A <: AnyRef] (keyspace: Byte, key: String) (implicit m:Manifest[A]) : Option[A] = { 
-    db.get(mkKey(keyspace, key)) match {
+    leveldb.get(mkKey(keyspace, key)) match {
       case null => None
       case bs   => Some(parse(asString(bs)).extract[A])
     }
   }
 
   private def getAll[A](keyspace: Byte) (implicit m:Manifest[A]): List[A] = {
-    val iterator = db.iterator
+    val iterator = leveldb.iterator
     iterator.seek(Array[Byte](keyspace))
     var ret = List[A]()
     while (iterator.hasNext && iterator.peekNext.getKey()(0) == keyspace) {
@@ -82,16 +96,16 @@ class Database(datapath: String) extends AutoCloseable {
     delete(KEYSPACE_IMDBMETADATA, imdbId)
   }
 
-  def tryGetVideoFile(videoId: String): Option[DatabaseVideoFile] = {
-    get[DatabaseVideoFile](KEYSPACE_VIDEOFILE, videoId)
+  def tryGetVideo(videoId: String): Option[DatabaseVideo] = {
+    get[DatabaseVideo](KEYSPACE_VIDEOFILE, videoId)
   }
-  def putVideoFile(videoFile: DatabaseVideoFile) {
+  def putVideo(videoFile: DatabaseVideo) {
     put(KEYSPACE_VIDEOFILE, videoFile.videoId, videoFile)
   }
-  def loadVideoFiles(): List[DatabaseVideoFile] = {
-    getAll[DatabaseVideoFile](KEYSPACE_VIDEOFILE)
+  def loadVideos(): List[DatabaseVideo] = {
+    getAll[DatabaseVideo](KEYSPACE_VIDEOFILE)
   }
-  def deleteVideoFile(videoId: String) {
+  def deleteVideo(videoId: String) {
     delete(KEYSPACE_VIDEOFILE, videoId)
   }
 
@@ -106,10 +120,6 @@ class Database(datapath: String) extends AutoCloseable {
   }
   def deleteProfile(profileId: String) {
     delete(KEYSPACE_PROFILE, profileId)
-  }
-
-  def close() {
-    db.close
   }
 
   // 
@@ -137,5 +147,9 @@ class Database(datapath: String) extends AutoCloseable {
         key
     }
   }
-}
 
+  def close() {
+    leveldb.close
+  }
+
+}

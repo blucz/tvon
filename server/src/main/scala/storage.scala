@@ -1,7 +1,5 @@
 package tvon.server;
 
-import scala.actors.Actor
-import scala.actors.Actor._
 import scala.collection.mutable._
 import java.nio._
 import java.util.concurrent.TimeUnit
@@ -25,34 +23,54 @@ object StorageBackend {
   case class FilesAdded   (backend: StorageBackend, files: List[StorageFile]) extends Event
   case class FilesModified(backend: StorageBackend, files: List[StorageFile]) extends Event
   case class FilesRemoved (backend: StorageBackend, files: List[StorageFile]) extends Event
-  case class Online       (backend: StorageBackend)
-  case class Offline      (backend: StorageBackend)
+  case class Online       (backend: StorageBackend) extends Event
+  case class Offline      (backend: StorageBackend) extends Event
 }
 
-trait StorageBackend {
+trait StorageBackend extends AutoCloseable {
   def id : String
-  def watch(existing: List[ExistingFile], listener: Actor) : CancelationToken
+  def watch(existing: List[ExistingFile], listener: (StorageBackend.Event) => Unit) : CancelationToken
+  def close()
 }
 
 class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) extends StorageBackend {
   val dirs             = new HashMap[Path, Dir]      // path -> dir
   var rootdir: Dir     = null
-  var listener : Actor = null
   var rootpath         = Paths.get(config.path).toAbsolutePath()
   var rootpathstring   = rootpath.toString()
 
+  var listener : (StorageBackend.Event) => Unit = null
+  var thread   : Thread                         = null
+  var watcher  : WatchService                   = null
+
   def id: String = config.id
 
-  def watch(existing: List[ExistingFile], listener: Actor) : CancelationToken = {
+  def watch(existing: List[ExistingFile], listener: (StorageBackend.Event) => Unit) : CancelationToken = {
     if (this.listener != null) {
       throw new IllegalStateException("dirstorage only supports one watch at a time")
     }
     this.listener = listener
     populate(existing)
     ThreadPool.queueLongRunning(watcher_thread)
-    listener ! StorageBackend.Online(this)
+    thread = new Thread(new Runnable() { def run() { watcher_thread() } })
+    thread.start()
+    listener(StorageBackend.Online(this))
     return new CancelationToken {
       def cancel() { DirectoryStorageBackend.this.listener = null }
+    }
+  }
+
+  def close() {
+    listener = null
+    val capture_thread  = thread
+    val capture_watcher = watcher
+    if (capture_thread != null) {
+      thread   = null
+      capture_thread.interrupt()
+      capture_thread.join()
+    }
+    if (capture_watcher != null) {
+      capture_watcher.close()
     }
   }
 
@@ -161,21 +179,21 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
 
   def flush_adds() {
     if (pending_adds.size() > 0) {
-      listener ! StorageBackend.FilesAdded(this, pending_adds.toList)
+      listener(StorageBackend.FilesAdded(this, pending_adds.toList))
       pending_adds.clear()
     }
   }
 
   def flush_removes() {
     if (pending_removes.size() > 0) {
-      listener ! StorageBackend.FilesRemoved(this, pending_removes.toList)
+      listener(StorageBackend.FilesRemoved(this, pending_removes.toList))
       pending_removes.clear()
     }
   }
 
   def flush_mods() {
     if (pending_mods.size() > 0) {
-      listener ! StorageBackend.FilesModified(this, pending_mods.toList)
+      listener(StorageBackend.FilesModified(this, pending_mods.toList))
       pending_mods.clear()
     }
   }
@@ -361,7 +379,7 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
   }
 
   def watcher_thread() {
-    val watcher = FileSystems.getDefault().newWatchService();
+    watcher = FileSystems.getDefault().newWatchService();
 
     /*
     Log.info("[dirstorage] performing initialization scan")
@@ -378,7 +396,9 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
       try {
         key = watcher.poll(2, TimeUnit.SECONDS)
       } catch {
-        case e:InterruptedException => return
+        case e:ClosedWatchServiceException => return
+        case e:ClosedByInterruptException  => return
+        case e:InterruptedException        => return
       }
 
       if (key == null) { // no activity in 2s; flush!

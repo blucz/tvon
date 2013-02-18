@@ -1,5 +1,13 @@
 package tvon.server
 
+trait IMDBDatabaseComponent       { val db: IMDBDatabase       }
+trait IMDBDatabase extends Database {
+    def putIMDBMetadata(metadata: DatabaseIMDBMetadata)
+    def tryGetIMDBMetadata(imdbId: String): Option[DatabaseIMDBMetadata]
+    def loadIMDBMetadata(): List[DatabaseIMDBMetadata]
+    def deleteIMDBMetadata(imdbId: String)
+}
+
 case class IMDBEpisodeJSON(
   val title            : Option[String],
   val season           : Int,

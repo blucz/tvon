@@ -10,7 +10,8 @@ case class Config(
   datapath:    String,
   webroot:     String,
   port:        Int, 
-  directories: List[DirectoryConfig]
+  directories: List[DirectoryConfig],
+  extensions:  List[String]
 )
 
 object Config {
@@ -26,4 +27,8 @@ object Config {
           case e:Exception             => Right(s"error parsing ${path}: ${e.getMessage()}")
         }
     }
+}
+
+trait ConfigComponent {
+  val config : Config
 }

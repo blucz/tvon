@@ -1,11 +1,19 @@
 package tvon.server;
 
+trait ProfileDatabaseComponent    { val db: ProfileDatabase    }
+trait ProfileDatabase extends Database {
+    def tryGetProfile(profileId: String): Option[DatabaseProfile]
+    def putProfile(profile: DatabaseProfile)
+    def loadProfiles(): List[DatabaseProfile]
+    def deleteProfile(profileId: String)
+}
+
 case class DatabaseProfile(
   profileId : String,
   name      : String
 )
 
-class Profile(profiles: Profiles, json: DatabaseProfile) {
+class Profile(json: DatabaseProfile) {
   val profileId : String = json.profileId
   var name      : String = json.name
 
@@ -15,6 +23,7 @@ class Profile(profiles: Profiles, json: DatabaseProfile) {
       name        = name
     )
   }
+
   def toApi: ApiProfile = {
     ApiProfile(
       profileId   = profileId,
@@ -23,33 +32,37 @@ class Profile(profiles: Profiles, json: DatabaseProfile) {
   }
 }
 
-class Profiles(val manager: Manager) {
-  var profiles = Map[String,Profile]()
+trait ProfilesComponent { this: ProfileDatabaseComponent =>
+  val profiles: Profiles = new Profiles
 
-  private def save(profile: Profile) {
-    manager.db.putProfile(profile.toDatabase)
-  }
+  class Profiles { 
+    var profiles = Map[String,Profile]()
 
-  def edit(profile: Profile, name: String) {
-    profile.name = name
-    save(profile)
-  }
+    def save(profile: Profile) {
+      db.putProfile(profile.toDatabase)
+    }
 
-  def create(name: String): Profile = {
-    val profile = new Profile(this, new DatabaseProfile(profileId = Utils.newGuid, name = name))
-    save(profile)
-    profiles += profile.profileId -> profile
-    profile
-  }
+    def edit(profile: Profile, name: String) {
+      profile.name = name
+      save(profile)
+    }
 
-  def delete(profile: Profile) {
-    manager.db.deleteProfile(profile.profileId)
-    profiles -= profile.profileId
-  }
+    def create(name: String): Profile = {
+      val profile = new Profile(new DatabaseProfile(profileId = Utils.newGuid, name = name))
+      save(profile)
+      profiles += profile.profileId -> profile
+      profile
+    }
 
-  def load() {
-    for (json <- manager.db.loadProfiles()) {
-      profiles+= json.profileId -> new Profile(this, json)
+    def delete(profile: Profile) {
+      db.deleteProfile(profile.profileId)
+      profiles -= profile.profileId
+    }
+
+    def init() {
+      for (json <- db.loadProfiles()) {
+        profiles+= json.profileId -> new Profile(json)
+      }
     }
   }
 }
