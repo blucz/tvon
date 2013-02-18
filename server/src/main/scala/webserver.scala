@@ -4,12 +4,24 @@ import org.scalatra._
 import java.nio.file._
 import java.io.File
 
-trait WebServerComponent { 
+trait WebServerComponent extends Lifecycle { 
   this: ConfigComponent with ProfilesComponent with CollectionComponent with BrowserComponent =>
   // extract these here because of name collisions on 'config'
   private val webroot = config.webroot
   private val port    = config.port
   val webServer = new WebServer
+
+  override def init() {
+    Log.info("[webserver] starting")
+    webServer.start()
+    super.init()
+  }
+
+  override def shutdown() {
+    super.shutdown()
+    Log.info("[webserver] shutting down")
+    webServer.stop()
+  }
 
   class WebServlet extends ScalatraServlet {
     import ApiHelpers._

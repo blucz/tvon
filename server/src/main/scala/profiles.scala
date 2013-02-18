@@ -32,8 +32,14 @@ class Profile(json: DatabaseProfile) {
   }
 }
 
-trait ProfilesComponent { this: ProfileDatabaseComponent =>
+trait ProfilesComponent extends Lifecycle { this: ProfileDatabaseComponent =>
   val profiles: Profiles = new Profiles
+
+  override def init() {
+    Log.info("[profiles] initializing")
+    profiles.init()
+    super.init()
+  }
 
   class Profiles { 
     var profiles = Map[String,Profile]()

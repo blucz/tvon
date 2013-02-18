@@ -12,8 +12,13 @@ trait CollectionDatabase extends Database {
     def deleteVideo(videoId: String)
 }
 
-trait CollectionComponent { this: CollectionDatabaseComponent =>
+trait CollectionComponent extends Lifecycle { this: CollectionDatabaseComponent =>
   val collection: Collection = new Collection
+  override def init() {
+    Log.info("[collection] initializing")
+    collection.init()
+    super.init()
+  }
   class Collection extends VideoEnvironment {
     val videos                  = new HashMap[String,Video]
     private val onlineStorageBackendIds = new HashSet[String]

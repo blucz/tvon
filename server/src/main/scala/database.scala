@@ -16,9 +16,15 @@ trait Database extends AutoCloseable { }
 trait LevelDbDatabaseComponent extends IMDBDatabaseComponent 
                                   with ProfileDatabaseComponent 
                                   with CollectionDatabaseComponent
-                                  with BrowseKeyDatabaseComponent { 
+                                  with BrowseKeyDatabaseComponent 
+                                  with Lifecycle { 
   this: ConfigComponent =>
   val db = new LevelDbDatabase(Paths.get(config.datapath).resolve("tvon.db").toString())
+  override def shutdown() {
+    super.shutdown()
+    Log.info("[db] closing")
+    db.close()
+  }
 }
 
 class LevelDbDatabase(datapath: String) extends Database with ProfileDatabase 

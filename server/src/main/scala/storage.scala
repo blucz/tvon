@@ -16,6 +16,29 @@ trait StorageFile {
   def signature : Option[String]
 }
 
+trait StorageComponent extends Lifecycle { this: ConfigComponent with CollectionComponent =>
+    var backends = List[StorageBackend]()
+  
+    override def init() {
+      Log.info("[storage] loading storage backends")
+      for (dirconfig <- config.directories) {
+        val backend = new DirectoryStorageBackend(dirconfig, config.extensions)
+        backends = backend::backends
+        collection.loadBackend(backend)
+      }
+      super.init()
+    }
+
+    override def shutdown() {
+      super.shutdown()
+      Log.info("[storage] closing storage backends")
+      for (backend <- backends) {
+        backend.close()
+      }
+      backends = List[StorageBackend]()
+    }
+}
+
 case class ExistingFile(key: String, modTime: Long)
 
 object StorageBackend {

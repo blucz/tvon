@@ -1,5 +1,10 @@
 package tvon.server
 
+trait Lifecycle {
+  def init()     { }
+  def shutdown() { }
+}
+
 object App extends {
     def main(args: Array[String]) {
         org.slf4j.LoggerFactory.getLogger("ROOT")
@@ -10,41 +15,26 @@ object App extends {
                                return
         }
 
-        class ConfigImpl extends ConfigComponent { val config = appconfig }
-        class AppInstance extends ConfigImpl
-                             with LevelDbDatabaseComponent
-                             with ProfilesComponent
-                             with CollectionComponent
-                             with BrowserComponent
+        trait ConfigComponentImpl extends ConfigComponent { val config = appconfig }
+        class AppInstance extends Lifecycle
+                             with ConfigComponentImpl
                              with WebServerComponent
+                             with StorageComponent
+                             with BrowserComponent
+                             with CollectionComponent
+                             with ProfilesComponent
+                             with LevelDbDatabaseComponent
         val app = new AppInstance
 
-        Log.info("initializing")
-        app.profiles.init()
-        app.collection.init()
-        app.webServer.start()
-
-        var backends = List[StorageBackend]()
-
-        Log.info("loading storage backends")
-        for (dirconfig <- appconfig.directories) {
-          val backend = new DirectoryStorageBackend(dirconfig, appconfig.extensions)
-          backends = backend::backends
-          app.collection.loadBackend(backend)
-        }
+        Log.info("[app] initializing")
+        app.init()
 
         Log.info("==============================================")
         Log.info("Press enter to exit")
         Log.info("==============================================")
         readLine()
 
-        Log.info("stopping storage")
-        for (backend <- backends) {
-          backend.close()
-        }
-        Log.info("exiting")
-        app.db.close()
-        Log.info("stopping server")
-        app.webServer.stop()
+        Log.info("[app] shutting down")
+        app.shutdown()
     }
 }
