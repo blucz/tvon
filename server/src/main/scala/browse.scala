@@ -72,7 +72,7 @@ trait BrowserComponent {
       if (comps.length == 0) {
         browse_root(params)
       } else {
-        browse(params, comps, collection.videos.values.toList)
+        browse(params, comps, collection.allVideos.toList)
       }
     }
 
@@ -175,7 +175,7 @@ trait BrowserComponent {
     }
 
     private def select(params: BrowseParameters, path: List[String]): (List[Video],List[String]) = {
-      select(params, path, collection.videos.values.toList)
+      select(params, path, collection.allVideos.toList)
     }
 
     private def select(params: BrowseParameters, path: List[String], videos: List[Video]): (List[Video],List[String]) = {

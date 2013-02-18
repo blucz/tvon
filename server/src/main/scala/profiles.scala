@@ -41,19 +41,21 @@ trait ProfilesComponent extends Lifecycle { this: ProfileDatabaseComponent =>
     super.init()
   }
 
-  class Profiles { 
+  class Profiles extends Lock { 
     var profiles = Map[String,Profile]()
 
-    def save(profile: Profile) {
+    private def save(profile: Profile) {
       db.putProfile(profile.toDatabase)
     }
 
     def edit(profile: Profile, name: String) {
-      profile.name = name
-      save(profile)
+      lock {
+        profile.name = name
+        save(profile)
+      }
     }
 
-    def create(name: String): Profile = {
+    def create(name: String): Profile = lock {
       val profile = new Profile(new DatabaseProfile(profileId = Utils.newGuid, name = name))
       save(profile)
       profiles += profile.profileId -> profile
@@ -61,13 +63,17 @@ trait ProfilesComponent extends Lifecycle { this: ProfileDatabaseComponent =>
     }
 
     def delete(profile: Profile) {
-      db.deleteProfile(profile.profileId)
-      profiles -= profile.profileId
+      lock {
+        db.deleteProfile(profile.profileId)
+        profiles -= profile.profileId
+      }
     }
 
     def init() {
-      for (json <- db.loadProfiles()) {
-        profiles+= json.profileId -> new Profile(json)
+      lock {
+        for (json <- db.loadProfiles()) {
+          profiles+= json.profileId -> new Profile(json)
+        }
       }
     }
   }

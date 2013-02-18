@@ -12,15 +12,20 @@ trait CollectionDatabase extends Database {
     def deleteVideo(videoId: String)
 }
 
-trait CollectionComponent extends Lifecycle { this: CollectionDatabaseComponent =>
+trait CollectionComponent extends Lifecycle with Lock { this: CollectionDatabaseComponent =>
   val collection: Collection = new Collection
+
   override def init() {
     Log.info("[collection] initializing")
     collection.init()
     super.init()
   }
+
+  //
+  // All public methods are synchronized for thread-safety
+  //
   class Collection extends VideoEnvironment {
-    val videos                  = new HashMap[String,Video]
+    private val videos                  = new HashMap[String,Video]
     private val onlineStorageBackendIds = new HashSet[String]
 
     def init() {
@@ -30,7 +35,10 @@ trait CollectionComponent extends Lifecycle { this: CollectionDatabaseComponent 
       Log.info(s"[collection] loaded ${videos.size} existing files")
     }
 
-    def isBackendOnline(storageBackendId: String): Boolean = {
+    // public API
+    def getVideo(videoId: String): Option[Video] = lock { videos.get(videoId) }
+    def allVideos: List[Video]                   = lock { videos.values.toList }
+    def isBackendOnline(storageBackendId: String): Boolean = lock {
       onlineStorageBackendIds.contains(storageBackendId)
     }
 
@@ -59,16 +67,18 @@ trait CollectionComponent extends Lifecycle { this: CollectionDatabaseComponent 
     // Storage Integration
     //
     def loadBackend(backend: StorageBackend) {
-        val existing = videos.values.filter(v => v.storageBackendId == backend.id && !v.deleted).map(video => new ExistingFile(video.storageKey, video.modTime)).toList
-        backend.watch(existing, (ev:StorageBackend.Event) => {
-          ev match {
-            case StorageBackend.FilesAdded(backend, files)    => onFilesAdded(backend, files)
-            case StorageBackend.FilesModified(backend, files) => onFilesModified(backend, files)
-            case StorageBackend.FilesRemoved(backend, files)  => onFilesRemoved(backend, files)
-            case StorageBackend.Online(backend)               => onBackendOnline(backend)
-            case StorageBackend.Offline(backend)              => onBackendOffline(backend)
-          }
-        })
+      val existing = lock {
+        videos.values.filter(v => v.storageBackendId == backend.id && !v.deleted).map(video => new ExistingFile(video.storageKey, video.modTime)).toList
+      }
+      backend.watch(existing, (ev:StorageBackend.Event) => lock {
+        ev match {
+          case StorageBackend.FilesAdded(backend, files)    => onFilesAdded(backend, files)
+          case StorageBackend.FilesModified(backend, files) => onFilesModified(backend, files)
+          case StorageBackend.FilesRemoved(backend, files)  => onFilesRemoved(backend, files)
+          case StorageBackend.Online(backend)               => onBackendOnline(backend)
+          case StorageBackend.Offline(backend)              => onBackendOffline(backend)
+        }
+      })
     }
 
     private def onBackendOnline (backend: StorageBackend) { onlineStorageBackendIds.add(backend.id)    }

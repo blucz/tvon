@@ -2,6 +2,13 @@ package tvon.server;
 
 import java.util.UUID
 
+trait Lock {
+  val _lock = new Object
+  def lock[A](code: => A): A = {
+    _lock.synchronized { code }
+  }
+}
+
 trait CancelationToken {
   def cancel() : Unit
 }

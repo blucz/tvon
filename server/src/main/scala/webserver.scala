@@ -58,12 +58,12 @@ trait WebServerComponent extends Lifecycle {
     //
     get("/api/videos") {
       setJson()
-      new ApiVideoList(collection.videos.values.map(_.toApi).toList).toResponseJson
+      new ApiVideoList(collection.allVideos.map(_.toApi).toList).toResponseJson
     }
 
     get("/api/videos/:id") {
       setJson()
-      collection.videos.get(params("id")) match {
+      collection.getVideo(params("id")) match {
         case None        => errorResponse("notfound")
         case Some(video) => video.toApi.toResponseJson
       }
