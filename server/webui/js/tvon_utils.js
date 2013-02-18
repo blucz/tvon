@@ -132,4 +132,11 @@ function POST(url, data) {
         data: data
     }
 }
+function GET(url, data) {
+    return {
+        type: "GET",
+        url:  url,
+        data: data
+    }
+}
 

@@ -10,6 +10,7 @@ class Manager(config: Config) extends Actor {
     val collection = new Collection(this)
     val extensions = List(".avi", ".mkv", ".mp4")
     val profiles   = new Profiles(this)
+    val browser    = new Browser(this)
 
     //
     // Public API, threadsafe

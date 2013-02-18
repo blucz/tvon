@@ -3,6 +3,8 @@
     "port":     8000,
     "webroot":  "webui",
     "directories": [
-        { "id": "1", "name": "Movies", "path": "/Users/Brian/Movies" }
+        { "id": "1", "name": "Movies",          "path": "/Users/Brian/Movies"      },
+        { "id": "2", "name": "Drobo Video",     "path": "/Volumes/Public/video"    },
+        { "id": "2", "name": "Drobo Incoming",  "path": "/Volumes/Public/incoming" }
     ]
 }

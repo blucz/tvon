@@ -2,6 +2,7 @@ package tvon.server
 
 import scala.collection.mutable._
 import java.util.Date
+import java.nio.file._
 
 //
 // Instances of this class should only be accessed from a single thread at a time
@@ -20,15 +21,12 @@ class Collection(val manager: Manager) {
   }
 
   def makeDatabaseVideoFile(backend: StorageBackend, file: StorageFile): DatabaseVideoFile = {
-    val basic = MetadataUtils.extractBasicMetadata(file.path.getFileName().toString())
-    new DatabaseVideoFile(
+    DatabaseVideoFile(
       videoId          = Utils.newGuid,
+      path             = file.path.toString(),
       storageBackendId = backend.id,
       storageKey       = file.key,
       modTime          = file.modTime,
-      title            = basic.title,
-      season           = basic.season, 
-      episodes         = basic.episodes,
       dateAdded        = new Date(),
       deleted          = false,
       signature        = file.signature
@@ -69,6 +67,7 @@ class Collection(val manager: Manager) {
                                 video.storageBackendId = backend.id
                                 video.storageKey       = file.key
                                 video.deleted          = false
+                                video.updatePath(file.path)
                                 save(video)
             case None =>
               Log.trace(s"[collection] add new file ${file.path}")
@@ -84,9 +83,9 @@ class Collection(val manager: Manager) {
     for (file <- files) {
       Log.trace(s"[collection] rm file ${file.path}")
       tryFindVideo(backend.id, file.key) match {
-        case None            => Log.warning(s"[collection] missing file ${file.key}")
-        case Some(videofile) => videofile.deleted = true
-                                save(videofile)
+        case None        => Log.warning(s"[collection] missing file ${file.key}")
+        case Some(video) => video.deleted = true
+                            save(video)
       }
     }
   }
@@ -95,10 +94,11 @@ class Collection(val manager: Manager) {
     for (file <- files) {
       Log.trace(s"[collection] mod file ${file.path}")
       tryFindVideo(backend.id, file.key) match {
-        case None            => Log.warning(s"[collection] missing file ${file.key}")
-        case Some(videofile) => videofile.modTime = file.modTime
-                                videofile.deleted = false
-                                save(videofile)
+        case None        => Log.warning(s"[collection] missing file ${file.key}")
+        case Some(video) => video.modTime = file.modTime
+                                video.deleted = false
+                                video.updatePath(file.path)
+                                save(video)
       }
     }
   }
@@ -109,12 +109,10 @@ case class DatabaseVideoFile (
   storageBackendId : String,
   storageKey       : String,
   modTime          : Long,
-  title            : String,    
-  season           : Option[Int],
-  episodes         : List[Int],
   deleted          : Boolean,
   dateAdded        : Date,
-  signature        : Option[String]
+  signature        : Option[String],
+  path             : String
 )
 
 case class ApiVideoFile (
@@ -123,7 +121,9 @@ case class ApiVideoFile (
   season           : Option[Int],
   episodes         : List[Int],
   available        : Boolean,
-  dateAdded        : Date
+  dateAdded        : Date,
+  year             : Option[Int],
+  part             : Option[Int]
 )
 
 case class ApiVideoList (
@@ -132,41 +132,82 @@ case class ApiVideoList (
 
 class VideoFile(collection: Collection, json: DatabaseVideoFile) {
   val videoId          : String         = json.videoId          
+  val dateAdded        : Date           = json.dateAdded
+
+  // mutable stuff that can change based on storage
   var storageBackendId : String         = json.storageBackendId 
   var storageKey       : String         = json.storageKey       
   var modTime          : Long           = json.modTime          
-  var title            : String         = json.title
-  var season           : Option[Int]    = json.season           
-  var episodes         : List[Int]      = json.episodes         
   var deleted          : Boolean        = json.deleted
-  var dateAdded        : Date           = json.dateAdded
   var signature        : Option[String] = json.signature
+  var path             : Path           = Paths.get(json.path)
+
+  // extract basic metadata from pathname
+  var basic = MetadataUtils.extractBasicMetadata(path.getFileName.toString)
+
+  def title            : String         = basic.title
+  def season           : Option[Int]    = basic.season           
+  def episodes         : List[Int]      = basic.episodes         
+  def year             : Option[Int]    = basic.year
+  def part             : Option[Int]    = basic.part
+
   def available        : Boolean        = collection.onlineStorageBackendIds.contains(storageBackendId) && !deleted
-  //def metadata         : Option[DatabaseIMDBMetadata] = resolveMetadata
+  def isTv             : Boolean        = !season.isEmpty 
+  def isMovie          : Boolean        = !isTv
+  def isOther          : Boolean        = false
+
+  def updatePath(newpath:Path) {
+    path   = newpath
+    basic = MetadataUtils.extractBasicMetadata(path.getFileName().toString())
+  }
+
+  def matchesShow(show: String): Boolean = isTv && Utils.normalizedEquals(title, show)
+  def matchesDirector(director: String): Boolean = false  // XXX: implement
+  def matchesGenre(genre: String): Boolean = false  // XXX: implement
+  def matchesActor(actor: String): Boolean = false  // XXX: implement
+  def matchesCountry(country: String): Boolean = false  // XXX: implement
+
+  def matchesSeason(testseason: Int): Boolean = {
+    season match {
+      case None           => false
+      case Some(myseason) => myseason == testseason 
+    }
+  }
+
+  def matchesDecade(testyear: Int): Boolean = {
+    year match {
+      case None         => false
+      case Some(myyear) => myyear / 10 == testyear / 10
+    }
+  }
+
+  def decade: Option[Int] = {
+    year.map(_/10)
+  }
 
   def toDatabase: DatabaseVideoFile = {
-    new DatabaseVideoFile(
+    DatabaseVideoFile(
       videoId          = videoId,
       storageBackendId = storageBackendId,
       storageKey       = storageKey,      
       modTime          = modTime,
-      title            = title,
-      season           = season,           
-      episodes         = episodes,          
       deleted          = deleted,
       dateAdded        = dateAdded,
-      signature        = signature
+      signature        = signature,
+      path             = path.toString
     )
   }
 
   def toApi: ApiVideoFile = {
-    new ApiVideoFile(
+    ApiVideoFile(
       videoId          = videoId,
       title            = title,
       season           = season,           
       episodes         = episodes,          
       available        = available,
-      dateAdded        = dateAdded
+      dateAdded        = dateAdded,
+      part             = part,
+      year             = year
     )
   }
 }

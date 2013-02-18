@@ -6,6 +6,7 @@ import scala.collection.mutable._
 import java.nio._
 import java.util.concurrent.TimeUnit
 import java.nio.file._
+import java.nio.channels._
 import java.nio.file.StandardWatchEventKinds._
 import scala.collection.JavaConversions._
 
@@ -133,8 +134,8 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
         flush_adds()
       }
     } catch {
-      case e:Throwable => Log.error(s"[dirstorage] error caching file data: ${e}")
-      e.printStackTrace
+      case e:ClosedByInterruptException => throw e
+      case e:Throwable                  => Log.error(s"[dirstorage] error caching file data: ${e}")
     }
   }
 
@@ -146,8 +147,8 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
         flush_mods()
       }
     } catch {
-      case e:Throwable => Log.error(s"[dirstorage] error caching file data: ${e}")
-      e.printStackTrace
+      case e:ClosedByInterruptException => throw e
+      case e:Throwable                  => Log.error(s"[dirstorage] error caching file data: ${e}")
     }
   }
 
@@ -303,66 +304,71 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
 
   // scan a directory, comparing against existing dirs + generating diffs
   def scan(watcher: WatchService, path: Path, dir: Dir, recurse: Boolean) {
+    try {
+      dir.ensureWatch(watcher)
 
-    dir.ensureWatch(watcher)
+      val dirset  = new HashSet[Dir]()
+      val fileset = new HashSet[File]()
 
-    val dirset  = new HashSet[Dir]()
-    val fileset = new HashSet[File]()
+      dir.subdirs.foreach(dirset.add)
+      dir.files.foreach(fileset.add)
 
-    dir.subdirs.foreach(dirset.add)
-    dir.files.foreach(fileset.add)
-
-    for (subpath <- Files.newDirectoryStream(path)) {
-      var filename = subpath.getFileName().toString()
-      if (Files.isDirectory(subpath)) {
-        dir.tryGetSubDir(filename) match {
-          case Some(subdir) => 
-            dirset.remove(subdir)
-            if (recurse) {
-              scan(watcher, subpath, subdir, recurse);
-            }
-          case None         =>
-            val subdir = dir.getOrCreateSubDir(subpath, filename)
-            scan(watcher, subpath, subdir, recurse);
-        }
-      } else {
-        if (isSupportedExtension(subpath)) {
-          val modTime  = subpath.toFile().lastModified()
-          dir.tryGetFile(filename) match {
-            case Some(file) => 
-              if (file.updateModTime(modTime)) {
-                queue_mod(file)
+      for (subpath <- Files.newDirectoryStream(path)) {
+        var filename = subpath.getFileName().toString()
+        if (Files.isDirectory(subpath)) {
+          dir.tryGetSubDir(filename) match {
+            case Some(subdir) => 
+              dirset.remove(subdir)
+              if (recurse) {
+                scan(watcher, subpath, subdir, recurse);
               }
-              fileset.remove(file)
-            case None       => 
-              var file = dir.getOrCreateFile(filename, subpath, modTime)
-              queue_add(file)
+            case None         =>
+              val subdir = dir.getOrCreateSubDir(subpath, filename)
+              scan(watcher, subpath, subdir, recurse);
+          }
+        } else {
+          if (isSupportedExtension(subpath)) {
+            val modTime  = subpath.toFile().lastModified()
+            dir.tryGetFile(filename) match {
+              case Some(file) => 
+                if (file.updateModTime(modTime)) {
+                  queue_mod(file)
+                }
+                fileset.remove(file)
+              case None       => 
+                var file = dir.getOrCreateFile(filename, subpath, modTime)
+                queue_add(file)
+            }
           }
         }
       }
-    }
 
-    for (file <- fileset) {
-      file.dir.files.remove(file)
-      queue_remove(file)
-    }
-
-    for (dir <- dirset) {
-      dir.removeFromParent()
-      for (file <- dir.getAllFiles()) {
+      for (file <- fileset) {
+        file.dir.files.remove(file)
         queue_remove(file)
       }
-      dir.cancelWatch()
+
+      for (dir <- dirset) {
+        dir.removeFromParent()
+        for (file <- dir.getAllFiles()) {
+          queue_remove(file)
+        }
+        dir.cancelWatch()
+      }
+    } catch {
+      case e:java.nio.channels.ClosedByInterruptException => return
     }
   }
 
   def watcher_thread() {
     val watcher = FileSystems.getDefault().newWatchService();
 
+    /*
     Log.info("[dirstorage] performing initialization scan")
     scan(watcher, rootpath, rootdir, true)
     flush();
     Log.info("[dirstorage] initialization scan complete")
+    */
 
     val pending_paths = new HashSet[Path]()
     var overflow      = false

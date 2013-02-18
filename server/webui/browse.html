@@ -1,3 +1,21 @@
-<div ng-controller='BrowseController'>
-    Browse
+<div ng-controller='BrowseController' id='tab_browse' class='vbox'>
+    <div class='flex' id='browse_list'>
+        <div>
+            {{level.item.title}}
+        </div>
+        <div ng-click='pop()' ng-show='can_back'>Go Back</div>
+
+        <div ng-show='!level.exists'>
+            No results found
+        </div>
+
+        <div ng-show='level.exists' ng-repeat='item in level.subitems' class='browseitem' ng-click='browse(item.path)'>
+            <div class='title'>
+                {{item.title}}
+            </div>
+            <div class='subtitle'>
+                {{item.subtitle}}
+            </div>
+        </div>
+    </div>
 </div>

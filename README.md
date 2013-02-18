@@ -37,7 +37,7 @@ Browse Hierarchy:
     All
         TV
             Grey's Anatomy
-                Season 1                                            --> Add all to queue, auto-add items to queue, shuffle
+                Season 1                                           --> Add all to queue, auto-add items to queue, shuffle
                    Episode 1 - Foo Bar             <state>         --> Delete, Play, Add to Queue, Resume (if partially watched)
                     Added 1/24/2012                                 <state> = Unwatched, Watched, Queued
         Movies

@@ -17,6 +17,8 @@ class Database(datapath: String) extends AutoCloseable {
   val KEYSPACE_VIDEOFILE        : Byte = 1
   val KEYSPACE_IMDBMETADATA     : Byte = 2
   val KEYSPACE_PROFILE          : Byte = 3
+  val KEYSPACE_KEY_TO_STRING    : Byte = 4
+  val KEYSPACE_STRING_TO_KEY    : Byte = 5
 
   val db = factory.open(new File(datapath), options);
 
@@ -28,6 +30,17 @@ class Database(datapath: String) extends AutoCloseable {
     bb.put(keyspace)
     bb.put(strbytes)
     bb.array
+  }
+
+  private def putString(keyspace: Byte, key: String, value: String) = {
+    db.put(mkKey(keyspace, key), bytes(value))
+  }
+
+  private def getString(keyspace: Byte, key: String): Option[String] = {
+    db.get(mkKey(keyspace, key)) match {
+      case null => None
+      case bs   => Some(asString(bs))
+    }
   }
 
   private def put[A <: AnyRef](keyspace: Byte, key: String, value: A) = {
@@ -97,6 +110,32 @@ class Database(datapath: String) extends AutoCloseable {
 
   def close() {
     db.close
+  }
+
+  // 
+  // map strings into url-safe keys + back
+  //
+  def keyToString(k:String): Option[String] = {
+    getString(KEYSPACE_KEY_TO_STRING, k) 
+  }
+
+  def stringToKey(s:String): String = {
+    getString(KEYSPACE_STRING_TO_KEY, s) match {
+      case Some(k) => k
+      case None    => 
+        var existing: Option[String] = None
+        var ordinal = 0
+        var cleankey = Utils.generateKey(s)
+        var key      = cleankey 
+        do {
+          if (ordinal != 0) { key = cleankey + "_" + ordinal }
+          existing = getString(KEYSPACE_KEY_TO_STRING, key)
+          ordinal += 1
+        } while (!existing.isEmpty)
+        putString(KEYSPACE_KEY_TO_STRING, key, s)
+        putString(KEYSPACE_STRING_TO_KEY, s, key)
+        key
+    }
   }
 }
 

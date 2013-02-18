@@ -1,7 +1,5 @@
 package tvon.server;
 
-import scala.collection.mutable._
-
 case class DatabaseProfile(
   profileId : String,
   name      : String
@@ -26,7 +24,7 @@ class Profile(profiles: Profiles, json: DatabaseProfile) {
 }
 
 class Profiles(val manager: Manager) {
-  val profiles = new HashMap[String,Profile]
+  var profiles = Map[String,Profile]()
 
   private def save(profile: Profile) {
     manager.db.putProfile(profile.toDatabase)
@@ -40,18 +38,18 @@ class Profiles(val manager: Manager) {
   def create(name: String): Profile = {
     val profile = new Profile(this, new DatabaseProfile(profileId = Utils.newGuid, name = name))
     save(profile)
-    profiles(profile.profileId) = profile
+    profiles += profile.profileId -> profile
     profile
   }
 
   def delete(profile: Profile) {
-    profiles.remove(profile.profileId)
     manager.db.deleteProfile(profile.profileId)
+    profiles -= profile.profileId
   }
 
   def load() {
     for (json <- manager.db.loadProfiles()) {
-      profiles(json.profileId) = new Profile(this, json)
+      profiles+= json.profileId -> new Profile(this, json)
     }
   }
 }

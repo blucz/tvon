@@ -9,6 +9,7 @@ class WebServlet(manager: Manager, webroot: String) extends ScalatraServlet {
 
   val collection = manager.collection
   val profiles   = manager.profiles
+  val browser    = manager.browser 
 
   val webrootpath = Paths.get(webroot)
 
@@ -18,6 +19,23 @@ class WebServlet(manager: Manager, webroot: String) extends ScalatraServlet {
 
   get("/") {
     redirect("/webui/index.html")
+  }
+
+  //
+  // Browse API
+  //
+  get("/api/browse")   { redirect("/api/browse/") }
+  get("/api/browse/*") {
+    setJson()
+    val browseparams = BrowseParameters(
+      profileId = params.get("profileId"),
+      path      = multiParams("splat").head,
+      screenId  = params.get("screenId")
+    )
+    browser.browse(browseparams) match {
+      case None        => errorResponse("notfound")
+      case Some(level) => level.toResponseJson
+    }
   }
 
   //

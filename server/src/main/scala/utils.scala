@@ -8,6 +8,16 @@ trait CancelationToken {
 
 object Utils {
   def newGuid(): String = UUID.randomUUID.toString.replace("-", "")
+  def normalizedEquals(s: String, t: String): Boolean = {
+    // XXX: unicode cleanup, etc
+    s.trim.equalsIgnoreCase(t.trim)
+  }
+  def generateKey(s:String): String = {
+    s.toLowerCase().map(c => c match {
+      case c if c.isLetterOrDigit => c
+      case _                      => '_'
+    })
+  }
 }
 
 object ThreadPool {

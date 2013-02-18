@@ -66,6 +66,7 @@ object MetadataUtils {
     """(?:^|[^\d])(\d)(\d\d)(?:$|[^\d])""",        // 102
     """(?:^|[^\d])(0\d)(\d\d)(?:$|[^\d])""",       // 0102
     """season (\d+),? episode (\d+)""",            // season 7 episode 1
+    """season (\d+) - episode (\d+)""",            // season 7 episode 1
     """[^\.\d](\d+)\.(\d+)[^\.\d]"""               // 1.2, 1.02
   )
   lazy val bracketedSeasonEpisode = seasonEpisode.map("""\[""" + _ + """\]""")
@@ -114,6 +115,7 @@ object MetadataUtils {
     "SFM",
     "iNTERNAL",
     "DVDRip",
+    "DVDrip",
     "TVRip",
     "BRRip",
     "divx",
@@ -152,7 +154,8 @@ object MetadataUtils {
     "pdtv",
     "PROPER",
     "PREAIR",
-    "Season Finale"
+    "Season Finale",
+    "Unrated Edition"
   )
 
   lazy val sceneWords = sceneBaseWords.map("[" + _) ++ sceneBaseWords.map("(" + _) ++ sceneBaseWords
