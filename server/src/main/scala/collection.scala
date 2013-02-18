@@ -12,7 +12,8 @@ trait CollectionDatabase extends Database {
     def deleteVideo(videoId: String)
 }
 
-trait CollectionComponent extends Lifecycle with Lock { this: CollectionDatabaseComponent =>
+trait CollectionComponent extends Lifecycle with Lock { 
+  this: CollectionDatabaseComponent with MetadataLookupComponent =>
   val collection: Collection = new Collection
 
   override def init() {
@@ -24,13 +25,13 @@ trait CollectionComponent extends Lifecycle with Lock { this: CollectionDatabase
   //
   // All public methods are synchronized for thread-safety
   //
-  class Collection extends VideoEnvironment {
+  class Collection {
     private val videos                  = new HashMap[String,Video]
     private val onlineStorageBackendIds = new HashSet[String]
 
     def init() {
       for (json <- db.loadVideos()) {
-        videos(json.videoId) = new Video(this, json)
+        videos(json.videoId) = new Video(env, json)
       }
       Log.info(s"[collection] loaded ${videos.size} existing files")
     }
@@ -38,9 +39,47 @@ trait CollectionComponent extends Lifecycle with Lock { this: CollectionDatabase
     // public API
     def getVideo(videoId: String): Option[Video] = lock { videos.get(videoId) }
     def allVideos: List[Video]                   = lock { videos.values.toList }
-    def isBackendOnline(storageBackendId: String): Boolean = lock {
-      onlineStorageBackendIds.contains(storageBackendId)
+    def availableVideos: List[Video]             = lock { videos.values.filter(_.available).toList }
+
+    private val countries = new HashMap[String,Country]()
+    private val directors = new HashMap[String,Director]()
+    private val actors    = new HashMap[String,Actor]()
+    private val writers   = new HashMap[String,Writer]()
+    private val languages = new HashMap[String,Language]()
+    private val genres    = new HashMap[String,Genre]()
+    private val shows     = new HashMap[String,Show]()
+
+    private def getImmutable[A](map: HashMap[String,A], name: String, cons: (String) => A): A = {
+      val key = Utils.getMergeKey(name)
+      map.get(key) match {
+        case None       => val item = cons(name)
+                           map(key) = item
+                           item
+        case Some(item) => item
+      }
     }
+
+    private val env = new VideoEnvironment {
+      def isBackendOnline(storageBackendId: String): Boolean = lock {
+        onlineStorageBackendIds.contains(storageBackendId)
+      }
+
+      def getCountry (name: String): Country  = lock { getImmutable(countries, name, new Country(_))  }
+      def getDirector(name: String): Director = lock { getImmutable(directors, name, new Director(_)) }
+      def getActor   (name: String): Actor    = lock { getImmutable(actors,    name, new Actor(_))    }
+      def getWriter  (name: String): Writer   = lock { getImmutable(writers,   name, new Writer(_))   }
+      def getLanguage(name: String): Language = lock { getImmutable(languages, name, new Language(_)) }
+      def getGenre   (name: String): Genre    = lock { getImmutable(genres,    name, new Genre(_))    }
+      def getShow    (name: String): Show     = lock { getImmutable(shows,     name, new Show(_))     }
+
+      def loadIMDBMetadata(video: Video): Option[IMDBMetadata] = lock {
+        metadatalookup.loadIMDBMetadata(video)
+      }
+    }
+
+    def updateIMDBMetadata(video: Video, imdb: Option[IMDBMetadata]) { lock {
+      video.updateIMDBMetadata(imdb)
+    } }
 
     private def makeDatabaseVideo(backend: StorageBackend, file: StorageFile): DatabaseVideo = {
       DatabaseVideo(
@@ -104,7 +143,7 @@ trait CollectionComponent extends Lifecycle with Lock { this: CollectionDatabase
                                   save(video)
               case None =>
                 Log.trace(s"[collection] add new file ${file.path}")
-                var video = new Video(this, makeDatabaseVideo(backend, file))
+                var video = new Video(env, makeDatabaseVideo(backend, file))
                                   save(video)
                                   videos(video.videoId) = video
             }

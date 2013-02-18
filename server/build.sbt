@@ -18,6 +18,7 @@ libraryDependencies ++= Seq(
   "org.iq80.leveldb"        % "leveldb"                   % "0.5",
   "org.scala-lang"          % "scala-actors"              % "2.10.0",
   "ch.qos.logback"          % "logback-classic"           % "1.0.9",
-  "net.databinder.dispatch"%% "dispatch-core"             % "0.9.5"
+  "org.scalaj"             %% "scalaj-http"               % "0.3.6"
 )
 
+scalacOptions += "-deprecation"

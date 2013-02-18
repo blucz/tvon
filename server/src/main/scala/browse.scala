@@ -6,8 +6,7 @@ trait BrowseKeyDatabase extends Database {
     def stringToKey(s:String): String
 }
 
-case class ApiBrowseAction {
-}
+case class ApiBrowseAction(name: String, action: String)
 
 case class ApiBrowseItem(
   path:     String,

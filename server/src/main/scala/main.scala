@@ -21,6 +21,7 @@ object App extends {
                   with WebServerComponent
                   with StorageComponent
                   with BrowserComponent
+                  with MetadataLookupComponent
                   with CollectionComponent
                   with ProfilesComponent
                   with LevelDbDatabaseComponent

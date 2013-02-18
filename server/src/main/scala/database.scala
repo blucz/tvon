@@ -13,7 +13,7 @@ import java.nio.file._
 
 trait Database extends AutoCloseable { }
 
-trait LevelDbDatabaseComponent extends IMDBDatabaseComponent 
+trait LevelDbDatabaseComponent extends MetadataDatabaseComponent 
                                   with ProfileDatabaseComponent 
                                   with CollectionDatabaseComponent
                                   with BrowseKeyDatabaseComponent 
@@ -28,7 +28,7 @@ trait LevelDbDatabaseComponent extends IMDBDatabaseComponent
 }
 
 class LevelDbDatabase(datapath: String) extends Database with ProfileDatabase 
-                                                         with IMDBDatabase 
+                                                         with MetadataDatabase 
                                                          with BrowseKeyDatabase 
                                                          with CollectionDatabase {
   val options  = new Options;
@@ -39,6 +39,7 @@ class LevelDbDatabase(datapath: String) extends Database with ProfileDatabase
   val KEYSPACE_PROFILE          : Byte = 3
   val KEYSPACE_KEY_TO_STRING    : Byte = 4
   val KEYSPACE_STRING_TO_KEY    : Byte = 5
+  val KEYSPACE_IMDBCACHEDLOOKUP : Byte = 6
 
   val leveldb = factory.open(new File(datapath), options);
 
@@ -89,17 +90,28 @@ class LevelDbDatabase(datapath: String) extends Database with ProfileDatabase
     ret
   }
 
-  def putIMDBMetadata(metadata: DatabaseIMDBMetadata) {
+  def putIMDBMetadata(metadata: IMDBMetadata) {
     put(KEYSPACE_IMDBMETADATA, metadata.imdb_id, metadata)
   }
-  def tryGetIMDBMetadata(imdbId: String): Option[DatabaseIMDBMetadata] = {
-    get[DatabaseIMDBMetadata](KEYSPACE_IMDBMETADATA, imdbId)
+  def tryGetIMDBMetadata(imdbId: String): Option[IMDBMetadata] = {
+    get[IMDBMetadata](KEYSPACE_IMDBMETADATA, imdbId)
   }
-  def loadIMDBMetadata(): List[DatabaseIMDBMetadata] = {
-    getAll[DatabaseIMDBMetadata](KEYSPACE_IMDBMETADATA)
+  def loadIMDBMetadata(): List[IMDBMetadata] = {
+    getAll[IMDBMetadata](KEYSPACE_IMDBMETADATA)
   }
   def deleteIMDBMetadata(imdbId: String) {
     delete(KEYSPACE_IMDBMETADATA, imdbId)
+  }
+
+  def loadCachedIMDBLookup(key: String): Option[Option[String]] = {
+    getString(KEYSPACE_IMDBCACHEDLOOKUP, key) match {
+      case None     => None
+      case Some("") => Some(None)
+      case Some(s)  => Some(Some(s))
+    }
+  }
+  def cacheIMDBLookup(key: String, value: Option[String]) {
+    putString(KEYSPACE_IMDBCACHEDLOOKUP, key, value getOrElse "")
   }
 
   def tryGetVideo(videoId: String): Option[DatabaseVideo] = {
@@ -141,7 +153,7 @@ class LevelDbDatabase(datapath: String) extends Database with ProfileDatabase
       case None    => 
         var existing: Option[String] = None
         var ordinal = 0
-        var cleankey = Utils.generateKey(s)
+        var cleankey = Utils.generateUrlSafeKey(s)
         var key      = cleankey 
         do {
           if (ordinal != 0) { key = cleankey + "_" + ordinal }

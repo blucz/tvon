@@ -1,6 +1,7 @@
 package tvon.server;
 
 import java.util.UUID
+import java.text.Normalizer
 
 trait Lock {
   val _lock = new Object
@@ -19,11 +20,19 @@ object Utils {
     // XXX: unicode cleanup, etc
     s.trim.equalsIgnoreCase(t.trim)
   }
-  def generateKey(s:String): String = {
+  def generateUrlSafeKey(s:String): String = {
     s.toLowerCase().map(c => c match {
       case c if c.isLetterOrDigit => c
       case _                      => '_'
     })
+  }
+  def getMergeKey(raw:String) = {
+    var base = raw.trim.toLowerCase.filter(!_.isWhitespace)
+    Normalizer.normalize(base, Normalizer.Form.NFD);
+  }
+  def getSortKey(raw:String) = {
+    var base = raw.trim.toLowerCase
+    Normalizer.normalize(base, Normalizer.Form.NFD);
   }
 }
 
