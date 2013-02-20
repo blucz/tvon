@@ -5,7 +5,7 @@ import java.nio.file._
 import java.io.File
 
 trait WebServerComponent extends Lifecycle { 
-  this: ConfigComponent with ProfilesComponent with CollectionComponent with BrowserComponent =>
+  this: ConfigComponent with ProfilesComponent with CollectionComponent with BrowserComponent with ImageCacheComponent =>
   // extract these here because of name collisions on 'config'
   private val webroot = config.webroot
   private val port    = config.port
@@ -34,6 +34,15 @@ trait WebServerComponent extends Lifecycle {
 
     get("/") {
       redirect("/webui/index.html")
+    }
+
+    get("/images") {
+      imagecache.getImage(params("url")) match {
+        case Some(cachedimage) => response.setHeader("Content-Type", cachedimage.mimeType)  
+                                  cachedimage.data
+        case None              => response.setStatus(404)
+                                  "Not found"
+      }
     }
 
     //
@@ -166,6 +175,7 @@ trait WebServerComponent extends Lifecycle {
           case p if p.endsWith(".js")   => "application/javascript"
           case p if p.endsWith(".js")   => "application/javascript"
           case p if p.endsWith(".jpg")  => "image/jpeg"
+          case p if p.endsWith(".gif")  => "image/gif"
           case p if p.endsWith(".png")  => "image/png"
           case p if p.endsWith(".ico")  => "application/x-icon"
           case _                        => "application/octet-stream"

@@ -15,7 +15,10 @@
 
     <body>
         <div id='container' ng-controller='MainController'>
-            <div id='header'>
+            <div id='main'>
+                <ng-include src='"browse.html"'></ng-include>
+            </div>
+            <div id='footer'>
                 <div class='item' id='profilepicker'>
                     <div class='title'>
                         Profile: 
@@ -25,9 +28,6 @@
                         <a open-dialog='dialog_addprofile'>[+]</a>
                     </div>
                 </div>
-            </div>
-            <div id='main'>
-                <ng-include src='"browse.html"'></ng-include>
             </div>
         </div>
 

@@ -1,36 +1,62 @@
 <div ng-controller='BrowseController' id='browse' class='vbox'>
-    <div class='flex' id='browse_list'>
+    <div class='flex' id='browselist'>
         <div class='header'>
             <div class='breadcrumbs hbox'>
+
+                <div class='breadcrumb hbox aligncenter back' ng-click='pop()' ng-show='can_back'>
+                    <div class='backarrow'>
+                        <img src='images/back.png'></img>
+                    </div>
+                    <div class='text clickable'>
+                        Back
+                    </div>
+                </div>
+
+                <div class='breadcrumb hbox aligncenter back' ng-show='!can_back'>
+                    <div class='backarrow'>
+                        <img src='images/back.png'></img>
+                    </div>
+                    <div class='text disabled'>
+                        Back
+                    </div>
+                </div>
+
                 <div class='breadcrumb hbox' ng-repeat='level in levels' ng-click='popto(level)'>
-                    <div class='sep' ng-show='level != levels[0]'> &gt;</div>
-                    <div class='text'>{{level.item.title}}</div>
+                    <div class='sep' ng-show='level != levels[0]'>&gt;</div>
+                    <div class='text clickable'>{{level.item.title}}</div>
                 </div>
             </div>
         </div>
 
-        <div class='browseitem' ng-click='pop()' ng-show='can_back'>
-            <div class='title'>
-                &lt;&lt; Go Back
+        <div class='body vbox'>
+            <div ng-show='level.is_loading' class='loading hbox aligncenter packcenter flex'>
+                <img src='images/spinner.gif' alt='Loading...'>
             </div>
-        </div>
 
-        <div ng-show='!level.exists' class='browseitem'>
-            <div class='title'>
-                No results found
+            <div ng-show='!level.exists && !level.is_loading' class='browseitem'>
+                <div class='title'>
+                    No results found
+                </div>
             </div>
-        </div>
 
-        <div ng-show='level.is_loading' class='loading'>
-            Loading...
-        </div>
-
-        <div ng-show='level.exists' ng-repeat='item in level.items' class='browseitem' ng-click='browse(item, item.path)'>
-            <div class='title'>
-                {{item.title}}
-            </div>
-            <div class='subtitle'>
-                {{item.subtitle}}
+            <div ng-show='level.exists' ng-repeat='item in level.items' class='clickable browseitem hbox' ng-click='browse(item, item.path)'>
+                <div class='image' ng-show='item.canHaveImage'> 
+                        <img ng-show='item.image' width='80' src='{{item.image}}' alt='{{item.title}}'></img>
+                        <div ng-show='!item.image' class='placeholder'>
+                    </div>
+                </div>
+                <div class='vbox flex'>
+                    <div class='title'>
+                        {{item.title}}
+                    </div>
+                    <div class='subtitle'>
+                        {{item.subtitle}}
+                    </div>
+                    <div class='flex'></div>
+                    <div class='technical'>
+                        {{item.technical}}
+                    </div>
+                </div>
             </div>
         </div>
     </div>

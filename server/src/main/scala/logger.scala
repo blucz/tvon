@@ -9,6 +9,14 @@ object Log {
   def warn   (s:String) { log.warn(s)  }
   def error  (s:String) { log.error(s) }
   def trace  (s:String) { log.trace(s) }
+  def warning(s:String, e:Throwable) { 
+    // XXX: print stack trace
+    warning(s + ": " + e);
+  }
+  def error(s:String, e:Throwable) { 
+    // XXX: print stack trace
+    error(s + ": " + e);
+  }
 }
 
 import ch.qos.logback.classic.spi.ILoggingEvent

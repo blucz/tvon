@@ -1,12 +1,5 @@
 package tvon.server
 
-import org.json4s._
-import org.json4s.native.JsonMethods._
-import org.json4s.native.Serialization
-
-import org.iq80.leveldb._
-import org.iq80.leveldb.impl.Iq80DBFactory._
-
 import java.io._
 import java.nio._
 import java.nio.file._
@@ -17,9 +10,10 @@ trait LevelDbDatabaseComponent extends MetadataDatabaseComponent
                                   with ProfileDatabaseComponent 
                                   with CollectionDatabaseComponent
                                   with BrowseKeyDatabaseComponent 
+                                  with ImageCacheDatabaseComponent
                                   with Lifecycle { 
   this: ConfigComponent =>
-  val db = new LevelDbDatabase(Paths.get(config.datapath).resolve("tvon.db").toString())
+  val db      = new LevelDbDatabase(Paths.get(config.datapath))
   override def shutdown() {
     super.shutdown()
     Log.info("[db] closing")
@@ -27,10 +21,15 @@ trait LevelDbDatabaseComponent extends MetadataDatabaseComponent
   }
 }
 
-class LevelDbDatabase(datapath: String) extends Database with ProfileDatabase 
+class LevelDbDatabase(datapath: Path) extends Database with ProfileDatabase 
                                                          with MetadataDatabase 
                                                          with BrowseKeyDatabase 
+                                                         with ImageCacheDatabase
                                                          with CollectionDatabase {
+  import org.iq80.leveldb._
+  import org.iq80.leveldb.impl.Iq80DBFactory._
+  import LevelDbExtensions._
+
   val options  = new Options;
   options.createIfMissing(true);
 
@@ -40,115 +39,70 @@ class LevelDbDatabase(datapath: String) extends Database with ProfileDatabase
   val KEYSPACE_KEY_TO_STRING    : Byte = 4
   val KEYSPACE_STRING_TO_KEY    : Byte = 5
   val KEYSPACE_IMDBCACHEDLOOKUP : Byte = 6
+  val KEYSPACE_CACHEDIMAGE      : Byte = 7
 
-  val leveldb = factory.open(new File(datapath), options);
-
-  implicit val formats = Serialization.formats(NoTypeHints)
-
-  private def mkKey(keyspace: Byte, key: String): Array[Byte] = {
-    val strbytes = bytes(key)
-    val bb       = ByteBuffer.allocate(strbytes.length + 1)
-    bb.put(keyspace)
-    bb.put(strbytes)
-    bb.array
-  }
-
-  private def putString(keyspace: Byte, key: String, value: String) = {
-    leveldb.put(mkKey(keyspace, key), bytes(value))
-  }
-
-  private def getString(keyspace: Byte, key: String): Option[String] = {
-    leveldb.get(mkKey(keyspace, key)) match {
-      case null => None
-      case bs   => Some(asString(bs))
-    }
-  }
-
-  private def put[A <: AnyRef](keyspace: Byte, key: String, value: A) = {
-    leveldb.put(mkKey(keyspace, key), bytes(Serialization.write(value)))
-  }
-
-  private def delete(keyspace: Byte, key: String) {
-    leveldb.delete(mkKey(keyspace, key))
-  }
-
-  private def get[A <: AnyRef] (keyspace: Byte, key: String) (implicit m:Manifest[A]) : Option[A] = { 
-    leveldb.get(mkKey(keyspace, key)) match {
-      case null => None
-      case bs   => Some(parse(asString(bs)).extract[A])
-    }
-  }
-
-  private def getAll[A](keyspace: Byte) (implicit m:Manifest[A]): List[A] = {
-    val iterator = leveldb.iterator
-    iterator.seek(Array[Byte](keyspace))
-    var ret = List[A]()
-    while (iterator.hasNext && iterator.peekNext.getKey()(0) == keyspace) {
-      ret = parse(asString(iterator.peekNext.getValue)).extract[A] :: ret
-      iterator.next
-    }
-    ret
-  }
+  val metadatadb: DB = factory.open(datapath.resolve("tvon.db").toFile, options);
+  val imagesdb  : DB = factory.open(datapath.resolve("images.db").toFile, options);
 
   def putIMDBMetadata(metadata: IMDBMetadata) {
-    put(KEYSPACE_IMDBMETADATA, metadata.imdb_id, metadata)
+    metadatadb.putJson(KEYSPACE_IMDBMETADATA, metadata.imdb_id, metadata)
   }
   def tryGetIMDBMetadata(imdbId: String): Option[IMDBMetadata] = {
-    get[IMDBMetadata](KEYSPACE_IMDBMETADATA, imdbId)
+    metadatadb.getJson[IMDBMetadata](KEYSPACE_IMDBMETADATA, imdbId)
   }
   def loadIMDBMetadata(): List[IMDBMetadata] = {
-    getAll[IMDBMetadata](KEYSPACE_IMDBMETADATA)
+    metadatadb.getAll[IMDBMetadata](KEYSPACE_IMDBMETADATA)
   }
   def deleteIMDBMetadata(imdbId: String) {
-    delete(KEYSPACE_IMDBMETADATA, imdbId)
+    metadatadb.delete(KEYSPACE_IMDBMETADATA, imdbId)
   }
 
   def loadCachedIMDBLookup(key: String): Option[Option[String]] = {
-    getString(KEYSPACE_IMDBCACHEDLOOKUP, key) match {
+    metadatadb.getString(KEYSPACE_IMDBCACHEDLOOKUP, key) match {
       case None     => None
       case Some("") => Some(None)
       case Some(s)  => Some(Some(s))
     }
   }
   def cacheIMDBLookup(key: String, value: Option[String]) {
-    putString(KEYSPACE_IMDBCACHEDLOOKUP, key, value getOrElse "")
+    metadatadb.putString(KEYSPACE_IMDBCACHEDLOOKUP, key, value getOrElse "")
   }
 
   def tryGetVideo(videoId: String): Option[DatabaseVideo] = {
-    get[DatabaseVideo](KEYSPACE_VIDEOFILE, videoId)
+    metadatadb.getJson[DatabaseVideo](KEYSPACE_VIDEOFILE, videoId)
   }
   def putVideo(videoFile: DatabaseVideo) {
-    put(KEYSPACE_VIDEOFILE, videoFile.videoId, videoFile)
+    metadatadb.putJson(KEYSPACE_VIDEOFILE, videoFile.videoId, videoFile)
   }
   def loadVideos(): List[DatabaseVideo] = {
-    getAll[DatabaseVideo](KEYSPACE_VIDEOFILE)
+    metadatadb.getAll[DatabaseVideo](KEYSPACE_VIDEOFILE)
   }
   def deleteVideo(videoId: String) {
-    delete(KEYSPACE_VIDEOFILE, videoId)
+    metadatadb.delete(KEYSPACE_VIDEOFILE, videoId)
   }
 
   def tryGetProfile(profileId: String): Option[DatabaseProfile] = {
-    get[DatabaseProfile](KEYSPACE_PROFILE, profileId)
+    metadatadb.getJson[DatabaseProfile](KEYSPACE_PROFILE, profileId)
   }
   def putProfile(profile: DatabaseProfile) {
-    put(KEYSPACE_PROFILE, profile.profileId, profile)
+    metadatadb.putJson(KEYSPACE_PROFILE, profile.profileId, profile)
   }
   def loadProfiles(): List[DatabaseProfile] = {
-    getAll[DatabaseProfile](KEYSPACE_PROFILE)
+    metadatadb.getAll[DatabaseProfile](KEYSPACE_PROFILE)
   }
   def deleteProfile(profileId: String) {
-    delete(KEYSPACE_PROFILE, profileId)
+    metadatadb.delete(KEYSPACE_PROFILE, profileId)
   }
 
   // 
   // map strings into url-safe keys + back
   //
   def keyToString(k:String): Option[String] = {
-    getString(KEYSPACE_KEY_TO_STRING, k) 
+    metadatadb.getString(KEYSPACE_KEY_TO_STRING, k) 
   }
 
   def stringToKey(s:String): String = {
-    getString(KEYSPACE_STRING_TO_KEY, s) match {
+    metadatadb.getString(KEYSPACE_STRING_TO_KEY, s) match {
       case Some(k) => k
       case None    => 
         var existing: Option[String] = None
@@ -157,17 +111,55 @@ class LevelDbDatabase(datapath: String) extends Database with ProfileDatabase
         var key      = cleankey 
         do {
           if (ordinal != 0) { key = cleankey + "_" + ordinal }
-          existing = getString(KEYSPACE_KEY_TO_STRING, key)
+          existing = metadatadb.getString(KEYSPACE_KEY_TO_STRING, key)
           ordinal += 1
         } while (!existing.isEmpty)
-        putString(KEYSPACE_KEY_TO_STRING, key, s)
-        putString(KEYSPACE_STRING_TO_KEY, s, key)
+        metadatadb.putString(KEYSPACE_KEY_TO_STRING, key, s)
+        metadatadb.putString(KEYSPACE_STRING_TO_KEY, s, key)
         key
     }
   }
 
-  def close() {
-    leveldb.close
+  // 
+  // cached image
+  //
+  object CachedImageBinaryFormat {
+    val VERSION = 1
+    def fromByteArray(bytes: Array[Byte]): CachedImage = {
+      val bytestream = new ByteArrayInputStream(bytes)
+      val stream     = new DataInputStream(bytestream)
+      val version = stream.readByte()
+      if (version != VERSION) throw new Exception("invalid cached image version")
+      val mimeType = stream.readUTF()
+      val len = stream.readInt()
+      val data = new Array[Byte](len)
+      stream.read(data, 0, len)
+      new CachedImage(mimeType,data)
+    }
+
+    def toByteArray(image: CachedImage) : Array[Byte] = {
+      var bytestream = new ByteArrayOutputStream
+      var stream = new DataOutputStream(bytestream)
+      stream.writeByte(VERSION)
+      stream.writeUTF(image.mimeType)
+      stream.writeInt(image.data.length)
+      stream.write(image.data, 0, image.data.length)
+      stream.flush()
+      bytestream.toByteArray()
+    }
   }
 
+  def loadCachedImage(key: String): Option[CachedImage] = {
+    imagesdb.getByteArray(KEYSPACE_CACHEDIMAGE, key).map(CachedImageBinaryFormat.fromByteArray(_))
+  }
+
+  def cacheImage(key: String, value: CachedImage) {
+    imagesdb.putByteArray(KEYSPACE_CACHEDIMAGE, key, CachedImageBinaryFormat.toByteArray(value))
+  }
+
+  def close() {
+    metadatadb.close()
+    imagesdb.close()
+  }
 }
+

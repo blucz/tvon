@@ -22,6 +22,7 @@ trait StorageComponent extends Lifecycle { this: ConfigComponent with Collection
     override def init() {
       Log.info("[storage] loading storage backends")
       for (dirconfig <- config.directories) {
+        Log.info(s"loading backend: ${dirconfig.path}")
         val backend = new DirectoryStorageBackend(dirconfig, config.extensions)
         backends = backend::backends
         collection.loadBackend(backend)
@@ -74,7 +75,6 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
     }
     this.listener = listener
     populate(existing)
-    ThreadPool.queueLongRunning(watcher_thread)
     thread = new Thread(new Runnable() { def run() { watcher_thread() } })
     thread.start()
     listener(StorageBackend.Online(this))

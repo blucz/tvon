@@ -24,6 +24,7 @@ object App extends {
                   with MetadataLookupComponent
                   with CollectionComponent
                   with ProfilesComponent
+                  with ImageCacheComponent
                   with LevelDbDatabaseComponent
  
         Log.info("[app] initializing")

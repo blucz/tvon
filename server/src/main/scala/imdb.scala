@@ -24,8 +24,17 @@ case class IMDBEpisode(
   val title            : Option[String],
   val season           : Int,
   val episode          : Int,
-  val date             : Option[Date]   
-)
+  val date             : Option[Date]) {
+
+  def unescapeHtml: IMDBEpisode = {
+    IMDBEpisode(
+      title   = title.map(Utils.htmlDecode(_)),
+      season  = season,
+      episode = episode,
+      date    = date
+    )
+  }
+}
 
 case class IMDBMetadata(
   val imdb_id          : String,
@@ -48,8 +57,34 @@ case class IMDBMetadata(
   val rated            : Option[String],
   val rating_count     : Option[Int],
   val release_date     : Option[Int],
-  val country          : List[String]
-)
+  val country          : List[String]) {
+
+  def unescapeHtml: IMDBMetadata = {
+    IMDBMetadata(
+      imdb_id       = imdb_id,
+      title          = Utils.htmlDecode(title),
+      writers        = writers.map(Utils.htmlDecode(_)),
+      actors         = actors.map(Utils.htmlDecode(_)),
+      genres         = genres.map(Utils.htmlDecode(_)),
+      directors      = directors.map(Utils.htmlDecode(_)),
+      `type`         = `type`,
+      year           = year,
+      episodes       = episodes.map(es => es.map(e => e.unescapeHtml)),
+      runtime        = runtime,
+      language       = genres.map(Utils.htmlDecode(_)),
+      film_locations = film_locations.map(Utils.htmlDecode(_)),
+      imdbUrl        = imdbUrl,
+      plot           = plot.map(Utils.htmlDecode(_)),
+      plot_simple    = plot.map(Utils.htmlDecode(_)),
+      poster         = poster,
+      rating         = rating,
+      rated          = rated,
+      rating_count   = rating_count,
+      release_date   = release_date,
+      country        = genres.map(Utils.htmlDecode(_))
+    )
+  }
+}
 
 trait MetadataLookupComponent extends Lifecycle { 
   this: CollectionComponent with MetadataDatabaseComponent => 
@@ -134,7 +169,7 @@ trait MetadataLookupComponent extends Lifecycle {
               db.cacheIMDBLookup(key, None)
               collection.updateIMDBMetadata(video, None)
             case results =>
-              val imdb = results.extract[List[IMDBMetadata]]
+              val imdb = results.extract[List[IMDBMetadata]].map(_.unescapeHtml)
 
               val metadata = imdb.head     // XXX: search all results + pick the best
               Log.trace(s"[metadata] got metadata: ${video.title} ==> ${metadata.title} ${metadata.year.map("("+_.toString+")") getOrElse ""}")

@@ -2,6 +2,7 @@ package tvon.server
 
 import java.util.Date
 import java.nio.file._
+import Extensions._
 
 case class DatabaseVideo (
   videoId          : String,
@@ -76,6 +77,28 @@ class Genre(val name: String) {
   val mergeKey = Utils.getMergeKey(name)
 }
 
+object VideoOrdering extends Ordering[Video] {
+  def compare(x:Video, y:Video): Int = {
+      if (x.sortKey < y.sortKey)                 return -1
+      if (x.sortKey > y.sortKey)                 return 1
+
+      if (!x.season.isEmpty && y.season.isEmpty) return -1
+      if (!y.season.isEmpty && x.season.isEmpty) return 1
+      if (!x.season.isEmpty && !y.season.isEmpty) {
+        if (x.season.get < y.season.get) return -1
+        if (x.season.get > y.season.get) return 1
+      }
+
+      if (!x.episodes.isEmpty && y.episodes.isEmpty) return -1
+      if (!y.episodes.isEmpty && x.episodes.isEmpty) return 1
+      if (!x.episodes.isEmpty && !y.episodes.isEmpty) {
+        if (x.episodes.min < y.episodes.min) return -1
+        if (x.episodes.min > y.episodes.min) return 1
+      }
+      return x.videoId compare y.videoId
+  }
+}
+
 class Video(env: VideoEnvironment, json: DatabaseVideo) {
   val videoId          : String               = json.videoId          
   val dateAdded        : Date                 = json.dateAdded
@@ -94,33 +117,51 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
   var plot             : Option[String]       = None
   var show             : Option[Show]         = None
   var year             : Option[Int]          = None
-  var basic            : BasicMetadata        = MetadataUtils.extractBasicMetadata(path.getFileName.toString)
+  var basic            : BasicMetadata        = MetadataUtils.extractBasicMetadata(path)
   var title            : String               = basic.title
   var imdb             : Option[IMDBMetadata] = env.loadIMDBMetadata(this)
+  var sortKey          : String               = Utils.getSortKey(title)
+  var image            : Option[String]       = None
+  var episodeTitle     : Option[String]       = basic.episodeTitle
 
   def compute() {
     // load imdb data
     imdb match {
       case None       =>
-        actors     = List[Actor]()
-        writers    = List[Writer]()
-        directors  = List[Director]()
-        genres     = List[Genre]()
-        languages  = List[Language]()
-        countries  = List[Country]()
-        plot       = None
-        year       = basic.year
-        title      = basic.title 
+        actors       = List[Actor]()
+        writers      = List[Writer]()
+        directors    = List[Director]()
+        genres       = List[Genre]()
+        languages    = List[Language]()
+        countries    = List[Country]()
+        plot         = None
+        year         = basic.year
+        title        = basic.title 
+        episodeTitle = basic.episodeTitle
+        image        = None
       case Some(imdb) =>
-        actors     = imdb.actors.map(env.getActor(_))
-        writers    = imdb.writers.map(env.getWriter(_))
-        directors  = imdb.directors.map(env.getDirector(_))
-        genres     = imdb.genres.map(env.getGenre(_))
-        languages  = imdb.language.map(env.getLanguage(_))
-        countries  = imdb.country.map(env.getCountry(_))
-        plot       = if (imdb.plot.isEmpty) { imdb.plot } else { imdb.plot_simple }
-        year       = if (imdb.year.isEmpty) { basic.year } else { imdb.year }
-        title      = imdb.title
+        actors       = imdb.actors.map(env.getActor(_))
+        writers      = imdb.writers.map(env.getWriter(_))
+        directors    = imdb.directors.map(env.getDirector(_))
+        genres       = imdb.genres.map(env.getGenre(_))
+        languages    = imdb.language.map(env.getLanguage(_))
+        countries    = imdb.country.map(env.getCountry(_))
+        plot         = if (imdb.plot.isEmpty) { imdb.plot } else { imdb.plot_simple }
+        year         = if (imdb.year.isEmpty) { basic.year } else { imdb.year }
+        title        = imdb.title
+        image        = imdb.poster
+        if (!season.isEmpty && !episodes.isEmpty && !imdb.episodes.isEmpty) {
+          episodeTitle = imdb.episodes.get.tryPick(x => if (x.season == season.get && episodes.contains(x.episode) && !x.title.isEmpty) {
+                                                          x.title
+                                                        } else {
+                                                          basic.episodeTitle
+                                                        }) match {
+                                                          case None => basic.episodeTitle
+                                                          case some => some
+                                                        }
+        }
+          basic.episodeTitle
+
     }
 
     //dump
@@ -129,6 +170,7 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
     } else {
       show = None
     }
+    sortKey = Utils.getSortKey(title)
   }
 
   def dump {
@@ -173,7 +215,7 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
 
   def updatePath(newpath:Path) {
     path   = newpath
-    updateBasicMetadata(MetadataUtils.extractBasicMetadata(path.getFileName().toString()))
+    updateBasicMetadata(MetadataUtils.extractBasicMetadata(path))
   }
 
   def matchesShow    (name: String): Boolean = !show.isEmpty && show.get == env.getShow(name)

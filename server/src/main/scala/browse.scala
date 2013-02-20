@@ -1,5 +1,8 @@
 package tvon.server
 
+import java.net.URLEncoder
+import Extensions._
+
 trait BrowseKeyDatabaseComponent  { val db: BrowseKeyDatabase  }
 trait BrowseKeyDatabase extends Database {
     def keyToString(k:String): Option[String]
@@ -9,10 +12,13 @@ trait BrowseKeyDatabase extends Database {
 case class ApiBrowseAction(name: String, action: String)
 
 case class ApiBrowseItem(
-  path:     String,
-  title:    String,
-  subtitle: String                = "",
-  actions:  List[ApiBrowseAction] = List[ApiBrowseAction]()
+  path:          String,
+  title:         String,
+  subtitle:      String = "",
+  technical:     String = "",
+  canHaveImage:  Boolean = false,
+  image:         Option[String] = None,
+  actions:       List[ApiBrowseAction] = List[ApiBrowseAction]()
 )
 
 case class ApiBrowseLevel(
@@ -57,8 +63,8 @@ trait BrowserComponent {
         ApiBrowseItem(path = "/movies/recentlyadded", title = s"Recently Added"),
         ApiBrowseItem(path = "/movies",               title = s"All"),
         ApiBrowseItem(path = "/movies/decades",       title = s"Decades"),    
-        ApiBrowseItem(path = "/movies/actors",        title = s"Actors"),
-        ApiBrowseItem(path = "/movies/directors",     title = s"Directors"),
+        //ApiBrowseItem(path = "/movies/actors",        title = s"Actors"),           disabled because slow in browser..need alphanav
+        //ApiBrowseItem(path = "/movies/directors",     title = s"Directors"),
         ApiBrowseItem(path = "/movies/genres",        title = s"Genres"),
         ApiBrowseItem(path = "/movies/countries",     title = s"Countries")
       )
@@ -67,6 +73,7 @@ trait BrowserComponent {
 
     // generate a browse level within a path
     def browse(params: BrowseParameters): Option[ApiBrowseLevel] = {
+      Log.debug(s"[browser] browse ${params.path}")
       val comps = params.path.split('/').filter(_ != "").toList
       if (comps.length == 0) {
         browse_root(params)
@@ -82,64 +89,95 @@ trait BrowserComponent {
 
     private def join(a:String, b:String) = a + "/" + b
 
-    private def videoSubtitle(v: Video): String = {
-      if (v.isTv) {
-        val e = v.episodes match {
+    private def videoSubtitle(video: Video): String = {
+      if (video.isTv) {
+        val e = video.episodes match {
           case Nil         => "?"
           case e1::e2::Nil => s"${e1}-${e2}"
           case es          => es mkString ", "
         }
-        val s = v.season getOrElse "?"
-        s"Season ${s}, Episode ${e}"
+        val s = video.season getOrElse "?"
+        val t = video.episodeTitle.map(" - " + _) getOrElse ""
+        s"Season ${s}, Episode ${e}${t}"
       } else {
-        v.year.map(_.toString) getOrElse ""
+        video.year.map(_.toString) getOrElse ""
       }
     }
 
+    private def getImageUrl(url: Option[String]) = url.map("/images?url=" + URLEncoder.encode(_, "utf8"))
+
     private def browse_videos(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
       if (videos.length == 0) { return None }
+
+      if (videos.forall(video => video.show == videos(0).show) && videos.map(_.season).distinct.length != 1) {
+        // we have all the same show, but multiple seasons, so insert new browse level
+        return browse_seasons(params, videos)
+      }
+
       val item     = ApiBrowseItem(path = params.path, title = s"${videos.length} Results")
-      val items = videos.map(v => ApiBrowseItem(
-        path     = join("videos", v.videoId),
-        title    = v.title,
-        subtitle = videoSubtitle(v)
+      val sortedvideos = videos.sorted(VideoOrdering)
+      val items = sortedvideos.map(video => ApiBrowseItem(
+        path         = join("videos", video.videoId),
+        title        = video.title,
+        subtitle     = videoSubtitle(video),
+        canHaveImage = true,
+        image        = getImageUrl(video.image),
+        technical    = video.path.toString
       ))
       finishBrowse(items)
     }
 
     private def browse_decades(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
-      val items = videos.filter(!_.decade.isEmpty).map(_.decade.get).map(decade =>
+      val items = videos.filter(!_.decade.isEmpty).map(_.decade.get).filter(_ > 1880).sorted.distinct.map(decade =>
           ApiBrowseItem(path = join(params.path, decade.toString), title = s"${decade}s")
       )
       finishBrowse(items)
     }
 
     private def browse_genres(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
-      None
+      val items = videos.flatMap(_.genres).distinct.sortBy(_.sortKey).map(genre => 
+          ApiBrowseItem(path = join(params.path, db.stringToKey(genre.name)), title = genre.name)
+      )
+      finishBrowse(items)
     }
 
     private def browse_actors(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
-      None
+      val items = videos.flatMap(_.actors).distinct.sortBy(_.sortKey).map(actor => 
+          ApiBrowseItem(path = join(params.path, db.stringToKey(actor.name)), title = actor.name)
+      )
+      finishBrowse(items)
     }
 
     private def browse_directors(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
-      None
+      val items = videos.flatMap(_.directors).distinct.sortBy(_.sortKey).map(director => 
+          ApiBrowseItem(path = join(params.path, db.stringToKey(director.name)), title = director.name)
+      )
+      finishBrowse(items)
     }
 
     private def browse_countries(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
-      None
+      val items = videos.flatMap(_.countries).distinct.sortBy(_.sortKey).map(country => 
+          ApiBrowseItem(path = join(params.path, db.stringToKey(country.name)), title = country.name)
+      )
+      finishBrowse(items)
     }
 
     private def browse_seasons(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
-      val items = videos.filter(!_.season.isEmpty).map(_.season.get).map(season =>
-          ApiBrowseItem(path = join(params.path, season.toString), title = s"Season ${season}")
+      val items = videos.filter(!_.season.isEmpty).map(_.season.get).distinct.sorted.map(season =>
+          ApiBrowseItem(path         = join(params.path, "seasons/" + season.toString), 
+                        title        = s"Season ${season}",
+                        canHaveImage = true,
+                        image        = getImageUrl(videos(0).image))
       )
       finishBrowse(items)
     }
 
     private def browse_shows(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
-      val items = videos.filter(_.isTv).map(_.title).distinct.sorted.map(title => 
-          ApiBrowseItem(path = join(params.path, db.stringToKey(title)), title = title)
+      val items = videos.filter(!_.show.isEmpty).distinctWith(_.show.get).sortBy(_.sortKey).map(video => 
+          ApiBrowseItem(path         = join(params.path, db.stringToKey(video.title)), 
+                        title        = video.show.get.name,
+                        canHaveImage = true,
+                        image        = getImageUrl(video.image))
       )
       finishBrowse(items)
     }
