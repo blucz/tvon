@@ -51,7 +51,8 @@ case class ApiVideo (
   plot             : Option[String],
   languages        : List[String],
   countries        : List[String],
-  image            : Option[String]
+  image            : Option[String],
+  technical        : String
 )
 
 case class ApiVideoList (
@@ -311,7 +312,8 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
       plot             = plot,
       languages        = languages.map(_.name),
       countries        = countries.map(_.name),
-      image            = env.getImageUrl(image)
+      image            = env.getImageUrl(image),
+      technical        = path.toString
     )
   }
 }

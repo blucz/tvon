@@ -267,6 +267,7 @@ a:hover {
 
 /* video details */
 .details {
+    position: relative;
     padding: 12px;
 }
 
@@ -297,4 +298,10 @@ a:hover {
 .details .plot {
     margin-top: 12px;
     font-size: 11pt;
+}
+.details .technical {
+    position: absolute;
+    bottom: 0px;
+    left:0px;
+    font-color: #999;
 }
