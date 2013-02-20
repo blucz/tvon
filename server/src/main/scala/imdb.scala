@@ -9,6 +9,8 @@ import java.util.Date
 import scalaj.http.Http
 import scalaj.http.HttpOptions
 
+import Extensions._
+
 trait MetadataDatabaseComponent       { val db: MetadataDatabase       }
 trait MetadataDatabase extends Database {
     def putIMDBMetadata(metadata: IMDBMetadata)
@@ -26,7 +28,7 @@ case class IMDBEpisode(
   val episode          : Int,
   val date             : Option[Date]) {
 
-  def unescapeHtml: IMDBEpisode = {
+  def fixUp: IMDBEpisode = {
     IMDBEpisode(
       title   = title.map(Utils.htmlDecode(_)),
       season  = season,
@@ -59,7 +61,7 @@ case class IMDBMetadata(
   val release_date     : Option[Int],
   val country          : List[String]) {
 
-  def unescapeHtml: IMDBMetadata = {
+  def fixUp: IMDBMetadata = {
     IMDBMetadata(
       imdb_id       = imdb_id,
       title          = Utils.htmlDecode(title),
@@ -69,7 +71,7 @@ case class IMDBMetadata(
       directors      = directors.map(Utils.htmlDecode(_)),
       `type`         = `type`,
       year           = year,
-      episodes       = episodes.map(es => es.map(e => e.unescapeHtml)),
+      episodes       = episodes.map(es => es.map(e => e.fixUp)),
       runtime        = runtime,
       language       = genres.map(Utils.htmlDecode(_)),
       film_locations = film_locations.map(Utils.htmlDecode(_)),
@@ -81,7 +83,7 @@ case class IMDBMetadata(
       rated          = rated,
       rating_count   = rating_count,
       release_date   = release_date,
-      country        = genres.map(Utils.htmlDecode(_))
+      country        = country.map(Utils.htmlDecode(_))
     )
   }
 }
@@ -140,21 +142,12 @@ trait MetadataLookupComponent extends Lifecycle {
               }
             case _ => 
           }
-          Thread.sleep(2000)   // sleep so we don't pound the service
+          Thread.sleep(1200)   // sleep so we don't pound the service
           if (WorkQueue.isshutdown) return
-          var basereq = if (video.isTv) {
-            Http("http://imdbapi.org/").params("title"   -> video.title,
-                                               "type"    -> "json",
-                                               "plot"    -> "full",
-                                               "limit"   -> "3",
-                                               "mt"      -> "TVS")
-          } else {
-            Http("http://imdbapi.org/").params("title"   -> video.title,
-                                               "type"    -> "json",
-                                               "plot"    -> "full",
-                                               "limit"   -> "3",
-                                               "mt"      -> "M")
-          }
+          var basereq = Http("http://imdbapi.org/").params("title"   -> video.title,
+                                                           "type"    -> "json",
+                                                           "plot"    -> "full",
+                                                           "limit"   -> "5")
           val json = basereq.headers("User-Agent" -> "tvon",
                                      "Accept"     -> "application/json")
                             .option(HttpOptions.connTimeout(30000))
@@ -169,10 +162,18 @@ trait MetadataLookupComponent extends Lifecycle {
               db.cacheIMDBLookup(key, None)
               collection.updateIMDBMetadata(video, None)
             case results =>
-              val imdb = results.extract[List[IMDBMetadata]].map(_.unescapeHtml)
+              val imdb = results.extract[List[IMDBMetadata]].map(_.fixUp)
 
-              val metadata = imdb.head     // XXX: search all results + pick the best
-              Log.trace(s"[metadata] got metadata: ${video.title} ==> ${metadata.title} ${metadata.year.map("("+_.toString+")") getOrElse ""}")
+              var metadata = imdb.sortBy(r => {
+                var points = 0
+                if (r.year == video.year) points += 1
+                if (Utils.getMergeKey(r.title) == Utils.getMergeKey(video.title)) points += 1
+                if (video.isTv && r.`type` == "TVS") points += 1
+                if (!video.isTv && r.`type` == "M") points += 1
+                -points
+              }).head
+
+              Log.trace(s"[metadata] got metadata: ${video.title} (${video.year getOrElse "?"}) ==> ${metadata.title} ${metadata.year.map("("+_.toString+")") getOrElse ""} (${metadata.`type`})")
               db.putIMDBMetadata(metadata)
               db.cacheIMDBLookup(key, Some(metadata.imdb_id))
               collection.updateIMDBMetadata(video, Some(metadata))
@@ -191,7 +192,7 @@ trait MetadataLookupComponent extends Lifecycle {
           Log.warning("[metadata] ignoring empty title")
           return None
         }
-        val key = "v1:" + video.isTv + ":" + video.title;
+        val key = "v5:" + video.isTv + ":" + (video.year.map(_.toString) getOrElse "?") + ":" + video.title;
         db.loadCachedIMDBLookup(key) match {
           case None               => WorkQueue ! Lookup(video, key); None    // kick off async lookup
           case Some(None)         => None
