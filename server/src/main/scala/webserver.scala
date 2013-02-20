@@ -39,6 +39,7 @@ trait WebServerComponent extends Lifecycle {
     get("/images") {
       imagecache.getImage(params("url")) match {
         case Some(cachedimage) => response.setHeader("Content-Type", cachedimage.mimeType)  
+                                  response.setHeader("Cache-Control", "max-age=7200, must-revalidate")
                                   cachedimage.data
         case None              => response.setStatus(404)
                                   "Not found"
