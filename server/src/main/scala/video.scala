@@ -15,6 +15,24 @@ case class DatabaseVideo (
   path             : String
 )
 
+case class ApiVideoLite (
+  videoId          : String,
+  title            : String,    
+  season           : Option[Int],
+  episodes         : List[Int],
+  available        : Boolean,
+  dateAdded        : Date,
+  episodeTitle     : Option[String],
+  year             : Option[Int],
+  part             : Option[Int],
+  rating           : Option[Double],
+  runtime          : Option[String],
+  actors           : List[String],
+  writers          : List[String],
+  directors        : List[String],
+  image            : Option[String]
+)
+
 case class ApiVideo (
   videoId          : String,
   title            : String,    
@@ -22,15 +40,26 @@ case class ApiVideo (
   episodes         : List[Int],
   available        : Boolean,
   dateAdded        : Date,
+  episodeTitle     : Option[String],
   year             : Option[Int],
-  part             : Option[Int]
+  part             : Option[Int],
+  rating           : Option[Double],
+  runtime          : Option[String],
+  actors           : List[String],
+  directors        : List[String],
+  writers          : List[String],
+  plot             : Option[String],
+  languages        : List[String],
+  countries        : List[String],
+  image            : Option[String]
 )
 
 case class ApiVideoList (
-  videos: List[ApiVideo]
+  videos: List[ApiVideoLite]
 )
 
 trait VideoEnvironment {
+  def getImageUrl(s:Option[String]): Option[String]
   def isBackendOnline(storageBackendId: String): Boolean
   def getCountry(name: String): Country 
   def getDirector(name: String): Director 
@@ -123,6 +152,8 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
   var sortKey          : String               = Utils.getSortKey(title)
   var image            : Option[String]       = None
   var episodeTitle     : Option[String]       = basic.episodeTitle
+  var runtime          : Option[String]       = None
+  var rating           : Option[Double]       = None
 
   def compute() {
     // load imdb data
@@ -139,6 +170,8 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
         title        = basic.title 
         episodeTitle = basic.episodeTitle
         image        = None
+        runtime      = None
+        rating       = None
       case Some(imdb) =>
         actors       = imdb.actors.map(env.getActor(_))
         writers      = imdb.writers.map(env.getWriter(_))
@@ -150,6 +183,8 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
         year         = if (imdb.year.isEmpty) { basic.year } else { imdb.year }
         title        = imdb.title
         image        = imdb.poster
+        runtime      = if (imdb.runtime.isEmpty) { None } else { Some(imdb.runtime.head) }
+        rating       = imdb.rating
         if (!season.isEmpty && !episodes.isEmpty && !imdb.episodes.isEmpty) {
           episodeTitle = imdb.episodes.get.tryPick(x => if (x.season == season.get && episodes.contains(x.episode) && !x.title.isEmpty) {
                                                           x.title
@@ -164,32 +199,12 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
 
     }
 
-    //dump
     if (isTv) {
       show = Some(env.getShow(title))
     } else {
       show = None
     }
     sortKey = Utils.getSortKey(title)
-  }
-
-  def dump {
-    Log.info(s"======================================================")
-    Log.info(s"Video title:        $title")
-    Log.info(s"      path:         $path")
-    if (isTv) {
-      Log.info(s"      season:       $season")
-      Log.info(s"      episodes:     $episodes")
-    }
-    Log.info(s"      dateAdded:    $dateAdded")
-    Log.info(s"      actors:       $actors")
-    Log.info(s"      directors:    $directors")
-    Log.info(s"      writers:      $writers")
-    Log.info(s"      genres:       $genres")
-    Log.info(s"      languages:    $languages")
-    Log.info(s"      countries:    $countries")
-    Log.info(s"      plot:         $plot")
-    Log.info(s"======================================================")
   }
 
   compute()
@@ -257,6 +272,26 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
     )
   }
 
+  def toApiLite: ApiVideoLite = {
+    ApiVideoLite(
+      videoId          = videoId,
+      title            = title,
+      season           = season,           
+      episodes         = episodes,          
+      available        = available,
+      dateAdded        = dateAdded,
+      episodeTitle     = episodeTitle,
+      part             = part,
+      year             = year,
+      rating           = rating,
+      runtime          = runtime,
+      actors           = actors.take(3).map(_.name),
+      writers          = writers.take(3).map(_.name),
+      directors        = directors.take(3).map(_.name),
+      image            = env.getImageUrl(image)
+    )
+  }
+
   def toApi: ApiVideo = {
     ApiVideo(
       videoId          = videoId,
@@ -265,8 +300,18 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
       episodes         = episodes,          
       available        = available,
       dateAdded        = dateAdded,
+      episodeTitle     = episodeTitle,
       part             = part,
-      year             = year
+      year             = year,
+      rating           = rating,
+      runtime          = runtime,
+      actors           = actors.map(_.name),
+      writers          = writers.map(_.name),
+      directors        = directors.map(_.name),
+      plot             = plot,
+      languages        = languages.map(_.name),
+      countries        = countries.map(_.name),
+      image            = env.getImageUrl(image)
     )
   }
 }

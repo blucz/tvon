@@ -67,7 +67,7 @@ trait WebServerComponent extends Lifecycle {
     //
     get("/api/videos") {
       setJson()
-      new ApiVideoList(collection.allVideos.map(_.toApi).toList).toResponseJson
+      new ApiVideoList(collection.allVideos.map(_.toApiLite).toList).toResponseJson
     }
 
     get("/api/videos/:id") {

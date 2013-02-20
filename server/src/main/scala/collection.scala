@@ -13,7 +13,7 @@ trait CollectionDatabase extends Database {
 }
 
 trait CollectionComponent extends Lifecycle with Lock { 
-  this: CollectionDatabaseComponent with MetadataLookupComponent =>
+  this: CollectionDatabaseComponent with MetadataLookupComponent with BrowserComponent =>
   val collection: Collection = new Collection
 
   override def init() {
@@ -71,6 +71,7 @@ trait CollectionComponent extends Lifecycle with Lock {
       def getLanguage(name: String): Language = lock { getImmutable(languages, name, new Language(_)) }
       def getGenre   (name: String): Genre    = lock { getImmutable(genres,    name, new Genre(_))    }
       def getShow    (name: String): Show     = lock { getImmutable(shows,     name, new Show(_))     }
+      def getImageUrl(url:  Option[String]): Option[String] = browser.getImageUrl(url)
 
       def loadIMDBMetadata(video: Video): Option[IMDBMetadata] = lock {
         metadatalookup.loadIMDBMetadata(video)

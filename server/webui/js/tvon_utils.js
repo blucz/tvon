@@ -5,6 +5,14 @@ var filters    = angular.module('tvon.filters', [])
 var directives = angular.module('tvon.directives', [])
 var app        = angular.module('tvon.app', ['tvon.filters', 'tvon.directives']);
 
+filters.filter('join', function () {
+    return function(list, joiner) {
+        if (joiner == undefined) joiner = ", "
+        if (list   == undefined) list   = []
+        return list.join(joiner)
+    }
+});
+
 //
 // Custom directives
 //

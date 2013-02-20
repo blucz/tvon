@@ -14,15 +14,17 @@ case class ApiBrowseAction(name: String, action: String)
 case class ApiBrowseItem(
   path:          String,
   title:         String,
-  subtitle:      String = "",
-  technical:     String = "",
-  canHaveImage:  Boolean = false,
-  image:         Option[String] = None,
-  actions:       List[ApiBrowseAction] = List[ApiBrowseAction]()
+  subtitle:      String                   = "",
+  technical:     String                   = "",
+  canHaveImage:  Boolean                  = false,
+  image:         Option[String]           = None,
+  actions:       List[ApiBrowseAction]    = List[ApiBrowseAction](),
+  video:         Option[ApiVideoLite]     = None
 )
 
 case class ApiBrowseLevel(
-  items: List[ApiBrowseItem]
+  items: List[ApiBrowseItem] = List[ApiBrowseItem](),
+  video: Option[ApiVideo]    = None
 )
 
 case class BrowseParameters(
@@ -104,7 +106,7 @@ trait BrowserComponent {
       }
     }
 
-    private def getImageUrl(url: Option[String]) = url.map("/images?url=" + URLEncoder.encode(_, "utf8"))
+    def getImageUrl(url: Option[String]) = url.map("/images?url=" + URLEncoder.encode(_, "utf8"))
 
     private def browse_videos(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
       if (videos.length == 0) { return None }
@@ -112,6 +114,10 @@ trait BrowserComponent {
       if (videos.forall(video => video.show == videos(0).show) && videos.map(_.season).distinct.length != 1) {
         // we have all the same show, but multiple seasons, so insert new browse level
         return browse_seasons(params, videos)
+      }
+
+      if (videos.length == 1) {
+        return finishBrowse(videos.head.toApi)
       }
 
       val item     = ApiBrowseItem(path = params.path, title = s"${videos.length} Results")
@@ -122,7 +128,8 @@ trait BrowserComponent {
         subtitle     = videoSubtitle(video),
         canHaveImage = true,
         image        = getImageUrl(video.image),
-        technical    = video.path.toString
+        technical    = video.path.toString,
+        video        = Some(video.toApiLite)
       ))
       finishBrowse(items)
     }
@@ -182,13 +189,12 @@ trait BrowserComponent {
       finishBrowse(items)
     }
 
-    private def finishBrowse(items: List[ApiBrowseItem]): Option[ApiBrowseLevel] = {
-      items match {
-        case Nil => None
-        case _   => Some(ApiBrowseLevel(items))
-      }
+    private def finishBrowse(video: ApiVideo): Option[ApiBrowseLevel] = Some(ApiBrowseLevel(video = Some(video)))
+
+    private def finishBrowse(items: List[ApiBrowseItem]): Option[ApiBrowseLevel] = items match {
+      case Nil => None
+      case _   => Some(ApiBrowseLevel(items = items))
     }
-    
 
     private def browse(params: BrowseParameters, fullpath: List[String], invideos: List[Video]): Option[ApiBrowseLevel] = {
       val (videos, path) = select(params, fullpath, invideos)
@@ -239,6 +245,7 @@ trait BrowserComponent {
         case "actors"::ParseKey(actor)::tl        => select(params, tl, videos.filter(_.matchesActor(actor)))
         case "genres"::ParseKey(genre)::tl        => select(params, tl, videos.filter(_.matchesGenre(genre)))
         case "countries"::ParseKey(country)::tl   => select(params, tl, videos.filter(_.matchesCountry(country)))
+        case "videos"::videoId::tl                => select(params, tl, videos.filter(_.videoId == videoId))
         case other                                => (videos, other) 
       }
     }

@@ -22,8 +22,8 @@
                 </div>
 
                 <div class='breadcrumb hbox' ng-repeat='level in levels' ng-click='popto(level)'>
-                    <div class='sep' ng-show='level != levels[0]'>&gt;</div>
-                    <div class='text clickable'>{{level.item.title}}</div>
+                    <div class='sep' ng-show='level != levels[0] && !level.video'>&gt;</div>
+                    <div class='text clickable' ng-show='!level.video'>{{level.item.title}}</div>
                 </div>
             </div>
         </div>
@@ -39,22 +39,74 @@
                 </div>
             </div>
 
+            <ng-switch on="level.video != null">
+                <div ng-switch-when='true' class='vbox alignstretch flex details'>
+                    <div class='hbox alignstretch'>
+                        <div class='left'>
+                            <img ng-show='level.video.image' width='240' src='{{level.video.image}}' alt='{{level.video.title}}'></img>
+                            <div ng-show='!level.video.image' class='bigplaceholder'></div>
+                        </div>
+                        <div class='right flex'>
+
+                            <div class='title' ng-show='!level.video'>{{level.video.title}}</div>
+                            <div class='subtitle' ng-show='!level.video'>{{level.video.subtitle}}</div>
+
+                            <div class='title' ng-show='!level.video.episodeTitle'>{{level.video.title}}</div>
+                            <div class='title' ng-show='level.video.episodeTitle'>{{level.video.episodeTitle}}</div>
+
+                            <div class='subtitle' ng-show='level.video.season '>Season {{level.video.season}}, Episode {{level.video.episodes|join:"-"}}</div>
+
+                            <div class='subtitle'>
+                                <span ng-show='level.video.year'>{{level.video.year}}</span><span ng-show='level.video.year && level.video.runtime'>, </span>
+                                <span ng-show='level.video.runtime'>{{level.video.runtime}}</span>
+                            </div>
+
+                            <div class='subsubtitle' ng-show='level.video.writers.length > 0'>
+                                <span class='label'>Written by</span> {{level.video.writers|join}}
+                            </div>
+                            <div class='subsubtitle' ng-show='level.video.directors.length > 0'>
+                                <span class='label'>Directed by</span> {{level.video.directors|join}}
+                            </div>
+                            <div class='subsubtitle' ng-show='level.video.actors.length > 0'>
+                                <span class='label'>Starring</span> {{level.video.actors|join}}
+                            </div>
+                        </div>
+                    </div>
+                    <div class='plot' ng-show='level.video.plot' class='alignstretch'>
+                        <p>{{level.video.plot}}</p>
+                    </div>
+                </div>
+            </ng-switch>
+
             <div ng-show='level.exists' ng-repeat='item in level.items' class='clickable browseitem hbox' ng-click='browse(item, item.path)'>
                 <div class='image' ng-show='item.canHaveImage'> 
                         <img ng-show='item.image' width='80' src='{{item.image}}' alt='{{item.title}}'></img>
                         <div ng-show='!item.image' class='placeholder'>
                     </div>
                 </div>
-                <div class='vbox flex'>
-                    <div class='title'>
-                        {{item.title}}
-                    </div>
+                <div class='flex' title='{{item.technical}}'>
+                    <div class='title' ng-show='!item.video'>{{item.title}}</div>
+                    <div class='subtitle' ng-show='!item.video'>{{item.subtitle}}</div>
+
+                    <div class='video' ng-show='item.video'>
+                    <div class='title' ng-show='!item.video.episodeTitle'>{{item.video.title}}</div>
+                    <div class='title' ng-show='item.video.episodeTitle'>{{item.video.episodeTitle}}</div>
+
+                    <div class='subtitle' ng-show='item.video.season '>Season {{item.video.season}}, Episode {{item.video.episodes|join:"-"}}</div>
+
                     <div class='subtitle'>
-                        {{item.subtitle}}
+                        <span ng-show='item.video.year'>{{item.video.year}}</span><span ng-show='item.video.year && item.video.runtime'>, </span>
+                        <span ng-show='item.video.runtime'>{{item.video.runtime}}</span>
                     </div>
-                    <div class='flex'></div>
-                    <div class='technical'>
-                        {{item.technical}}
+
+                    <div class='subsubtitle' ng-show='item.video.writers.length > 0'>
+                        <span class='label'>Written by: </span> {{item.video.writers|join}}
+                    </div>
+                    <div class='subsubtitle' ng-show='item.video.directors.length > 0'>
+                        <span class='label'>Directed by: </span> {{item.video.directors|join}}
+                    </div>
+                    <div class='subsubtitle' ng-show='item.video.actors.length > 0'>
+                        <span class='label'>Starring: </span> {{item.video.actors|join}}
                     </div>
                 </div>
             </div>

@@ -220,7 +220,14 @@ a:hover {
 .browseitem .image {
     width:        80px;
     height:       120px;
-    margin-right: 8px;
+    margin-right: 12px;
+}
+
+.browseitem .image .placeholder {
+    width:  240x;
+    height:360px;
+    background: #ccc;
+    border: 1px solid #666;
 }
 
 .browseitem .image .placeholder {
@@ -244,12 +251,50 @@ a:hover {
 }
 .browseitem .title {
     font-size: 15pt;
+    margin-bottom: 4px;
+}
+.browseitem .label {
+    color: #666;
+}
+.browseitem .subsubtitle {
+    font-size: 9pt;
+    margin-bottom: 4px;
 }
 .browseitem .subtitle {
     font-size: 11pt;
-}
-.browseitem .technical {
-    font-size: 9pt;
-    color: #999;
+    margin-bottom: 4px;
 }
 
+/* video details */
+.details {
+    padding: 12px;
+}
+
+.details .title {
+    font-size: 17pt;
+    margin-top: 8px;
+    margin-bottom: 12px;
+    font-weight: bold;
+}
+.details .label {
+    color: #666;
+}
+.details .subsubtitle {
+    font-size: 11pt;
+    margin-bottom: 6px;
+}
+.details .subtitle {
+    font-size: 13pt;
+    margin-bottom: 8px;
+}
+.details .technical {
+    font-size: 11pt;
+    color: #999;
+}
+.details .right {
+    padding-left: 12px;
+}
+.details .plot {
+    margin-top: 12px;
+    font-size: 11pt;
+}

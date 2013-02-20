@@ -43,8 +43,10 @@ function BrowseController($scope, $rootScope) {
             $scope.$apply(function(){ 
                 $scope.level.is_loading = false
                 if (data.status == "success") {
-                    $scope.level.exists = true
                     $scope.level.items = data.value.items
+                    $scope.level.video = data.value.video
+                    $scope.level.exists = true
+                    console.log($scope.level)
                 }
                 refresh();
             })
@@ -96,3 +98,4 @@ function AddProfileController($scope, $rootScope) {
         })
     }
 }
+
