@@ -80,6 +80,7 @@ object MetadataUtils {
     "VFUA",
     "SFM",
     "iNTERNAL",
+    "DVDRIP",
     "DVDRip",
     "DVDrip",
     "TVRip",

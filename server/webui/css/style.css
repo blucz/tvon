@@ -238,6 +238,10 @@ a:hover {
     border-bottom: 1px solid #aaa;
 }
 
+.browseitem .noresults {
+    font-size: 15pt;
+    font-color: #aaa;
+}
 .browseitem .title {
     font-size: 15pt;
 }
