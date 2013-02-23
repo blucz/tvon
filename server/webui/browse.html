@@ -80,8 +80,10 @@
 
             <div ng-show='level.exists' ng-repeat='item in level.items' class='clickable browseitem hbox' ng-click='browse(item, item.path)'>
                 <div class='image' ng-show='item.canHaveImage'> 
-                        <img ng-show='item.image' width='80' src='{{item.image}}' alt='{{item.title}}'></img>
-                        <div ng-show='!item.image' class='placeholder'>
+                        <ng-switch on='item.image != undefined'>
+                            <img ng-switch-when='true' width='80' src='{{item.image}}' alt='{{item.title}}'></img>
+                            <div ng-switch-when='false' class='placeholder'>
+                        </ng-switch>
                     </div>
                 </div>
                 <div class='flex' title='{{item.technical}}'>

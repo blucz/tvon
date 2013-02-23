@@ -10,7 +10,7 @@ trait BrowseKeyDatabase extends Database {
     def stringToKey(s:String): String
 }
 
-case class ApiBrowseAction(name: String, action: String)
+case class ApiBrowseAction(name: String, icon: Option[String], action: String)
 case class ApiBrowseMetadata(label: String, value: String)
 
 case class ApiBrowseItem(
