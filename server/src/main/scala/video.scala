@@ -59,6 +59,13 @@ case class ApiVideoList (
   videos: List[ApiVideoLite]
 )
 
+case class VideoLink(
+  videoId:  String,
+  imdbId:   Option[String],
+  season:   Option[Int],
+  episodes: List[Int]   
+)
+
 trait VideoEnvironment {
   def getImageUrl(s:Option[String]): Option[String]
   def isBackendOnline(storageBackendId: String): Boolean
@@ -155,6 +162,9 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
   var episodeTitle     : Option[String]       = basic.episodeTitle
   var runtime          : Option[String]       = None
   var rating           : Option[Double]       = None
+  var imdbId           : Option[String]       = None
+
+  def link: VideoLink = VideoLink(videoId = videoId, imdbId = imdbId, season = season, episodes = episodes)
 
   def compute() {
     // load imdb data
@@ -173,6 +183,7 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
         image        = None
         runtime      = None
         rating       = None
+        imdbId       = None
       case Some(imdb) =>
         actors       = imdb.actors.map(env.getActor(_))
         writers      = imdb.writers.map(env.getWriter(_))
@@ -186,6 +197,7 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
         image        = imdb.poster
         runtime      = if (imdb.runtime.isEmpty) { None } else { Some(imdb.runtime.head) }
         rating       = imdb.rating
+        imdbId       = Some(imdb.imdb_id)
         if (!season.isEmpty && !episodes.isEmpty && !imdb.episodes.isEmpty) {
           episodeTitle = imdb.episodes.get.tryPick(x => if (x.season == season.get && episodes.contains(x.episode) && !x.title.isEmpty) {
                                                           x.title
@@ -241,6 +253,17 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
   def matchesActor   (name: String): Boolean = actors.contains(env.getActor(name))
   def matchesLanguage(name: String): Boolean = languages.contains(env.getLanguage(name))
   def matchesCountry (name: String): Boolean = countries.contains(env.getCountry(name))
+  def matchesLink    (link: VideoLink): Boolean = {
+    (link.videoId == videoId) || 
+    (!imdbId.isEmpty && imdbId == link.imdbId && season == link.season && episodes == link.episodes)
+  }
+
+  def isWatched (profile: Profile): Boolean = profile.history.exists(item => matchesLink(item.videoLink))
+  def isFavorite(profile: Profile): Boolean = profile.favorites.exists(item => matchesLink(item))
+
+  def watchedSince(profile: Profile, date: Date) = {
+    profile.history.exists(item => matchesLink(item.videoLink) && item.watched.after(date))
+  }
 
   def matchesSeason(testseason: Int): Boolean = {
     season match {

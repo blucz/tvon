@@ -5,6 +5,7 @@ import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization
 import java.net.URLEncoder
 import java.util.Date
+import scala.collection.mutable._
 
 import scalaj.http.Http
 import scalaj.http.HttpOptions
@@ -187,6 +188,8 @@ trait MetadataLookupComponent extends Lifecycle {
         }
       }
 
+      val inmem_cache: HashMap[String, IMDBMetadata] = new HashMap[String,IMDBMetadata]()
+
       def loadIMDBMetadata(video: Video): Option[IMDBMetadata] = {
         if (video.title.trim == "") {
           Log.warning("[metadata] ignoring empty title")
@@ -196,10 +199,15 @@ trait MetadataLookupComponent extends Lifecycle {
         db.loadCachedIMDBLookup(key) match {
           case None               => WorkQueue ! Lookup(video, key); None    // kick off async lookup
           case Some(None)         => None
-          case Some(Some(imdbid)) => db.tryGetIMDBMetadata(imdbid) match {
-            case Some(imdb) => Some(imdb)
-            case None       => WorkQueue ! Lookup(video, key); None
-          }
+          case Some(Some(imdbid)) => 
+            inmem_cache.get(imdbid) match {
+              case None        =>
+                db.tryGetIMDBMetadata(imdbid) match {
+                  case Some(imdb) => inmem_cache(imdbid) = imdb; Some(imdb)
+                  case None       => WorkQueue ! Lookup(video, key); None
+                }
+              case Some(imdb) => Some(imdb)
+            }
         }
       }
   }

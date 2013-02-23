@@ -171,7 +171,7 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
     try {
       file.ensureCached()
       pending_adds.append(file)
-      if (pending_adds.size() >= 100) {
+      if (pending_adds.size() >= 10) {
         flush_adds()
       }
     } catch {
@@ -184,7 +184,7 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
     try {
       file.ensureCached()
       pending_mods.append(file)
-      if (pending_mods.size() >= 100) {
+      if (pending_mods.size() >= 10) {
         flush_mods()
       }
     } catch {
@@ -195,7 +195,7 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
 
   private def queue_remove(file: File) { 
     pending_removes.append(file) 
-    if (pending_removes.size() >= 100) {
+    if (pending_removes.size() >= 10) {
       flush_removes()
     }
   }
@@ -307,6 +307,7 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
       }
       path = path.resolve(splits.last)
       dir.getOrCreateFile(splits.last, path, file.modTime)
+      //Log.debug(s"adding existing file ${file.key}")
     }
   }
 
@@ -346,6 +347,7 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
   // scan a directory, comparing against existing dirs + generating diffs
   def scan(watcher: WatchService, path: Path, dir: Dir, recurse: Boolean) {
     try {
+      if (listener == null) return
       dir.ensureWatch(watcher)
 
       val dirset  = new HashSet[Dir]()
@@ -355,6 +357,7 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
       dir.files.foreach(fileset.add)
 
       for (subpath <- Files.newDirectoryStream(path)) {
+        if (listener == null) return
         var filename = subpath.getFileName().toString()
         if (Files.isDirectory(subpath)) {
           dir.tryGetSubDir(filename) match {
@@ -404,12 +407,10 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
   def watcher_thread() {
     watcher = FileSystems.getDefault().newWatchService();
 
-    /*
     Log.info("[dirstorage] performing initialization scan")
     scan(watcher, rootpath, rootdir, true)
     flush();
     Log.info("[dirstorage] initialization scan complete")
-    */
 
     val pending_paths = new HashSet[Path]()
     var overflow      = false
@@ -431,7 +432,7 @@ class DirectoryStorageBackend(config:DirectoryConfig, extensions: List[String]) 
           flush();
         } else {
           for (dirpath <- pending_paths) {
-              Log.trace(s"[dirstorage] scanning ${dirpath}")
+              Log.info(s"[dirstorage] scanning ${dirpath}")
               var dir     = getDir(dirpath)
               scan(watcher, dirpath, dir, false)
           }

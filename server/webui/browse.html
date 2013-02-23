@@ -48,8 +48,8 @@
                         </div>
                         <div class='right flex'>
 
-                            <div class='title' ng-show='!level.video'>{{level.video.title}}</div>
-                            <div class='subtitle' ng-show='!level.video'>{{level.video.subtitle}}</div>
+                            <div class='title' ng-show='!level.video'>{{level.title}}</div>
+                            <div class='subtitles' ng-repeat='subtitle in level.subtitles' ng-show='!level.video'>{{subtitle}}</div>
 
                             <div class='title' ng-show='!level.video.episodeTitle'>{{level.video.title}}</div>
                             <div class='title' ng-show='level.video.episodeTitle'>{{level.video.episodeTitle}}</div>
@@ -85,28 +85,10 @@
                     </div>
                 </div>
                 <div class='flex' title='{{item.technical}}'>
-                    <div class='title' ng-show='!item.video'>{{item.title}}</div>
-                    <div class='subtitle' ng-show='!item.video'>{{item.subtitle}}</div>
-
-                    <div class='video' ng-show='item.video'>
-                    <div class='title' ng-show='!item.video.episodeTitle'>{{item.video.title}}</div>
-                    <div class='title' ng-show='item.video.episodeTitle'>{{item.video.episodeTitle}}</div>
-
-                    <div class='subtitle' ng-show='item.video.season '>Season {{item.video.season}}, Episode {{item.video.episodes|join:"-"}}</div>
-
-                    <div class='subtitle'>
-                        <span ng-show='item.video.year'>{{item.video.year}}</span><span ng-show='item.video.year && item.video.runtime'>, </span>
-                        <span ng-show='item.video.runtime'>{{item.video.runtime}}</span>
-                    </div>
-
-                    <div class='subsubtitle' ng-show='item.video.writers.length > 0'>
-                        <span class='label'>Written by: </span> {{item.video.writers|join}}
-                    </div>
-                    <div class='subsubtitle' ng-show='item.video.directors.length > 0'>
-                        <span class='label'>Directed by: </span> {{item.video.directors|join}}
-                    </div>
-                    <div class='subsubtitle' ng-show='item.video.actors.length > 0'>
-                        <span class='label'>Starring: </span> {{item.video.actors|join}}
+                    <div class='title'>{{item.title}}</div>
+                    <div class='subtitle' ng-repeat='subtitle in item.subtitles'>{{subtitle}}</div>
+                    <div class='subsubtitle' ng-repeat='metadata in item.metadata'>     
+                        <span class='label'>{{metadata.label}}</span> {{metadata.value}}
                     </div>
                 </div>
             </div>

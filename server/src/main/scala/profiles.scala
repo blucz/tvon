@@ -1,4 +1,6 @@
-package tvon.server;
+package tvon.server
+
+import java.util.Date
 
 trait ProfileDatabaseComponent    { val db: ProfileDatabase    }
 trait ProfileDatabase extends Database {
@@ -9,13 +11,36 @@ trait ProfileDatabase extends Database {
 }
 
 case class DatabaseProfile(
-  profileId : String,
-  name      : String
+  profileId     : String,
+  name          : String,
+  autoQueue     : List[AutoQueueItem]       = List(),
+  explicitQueue : List[ExplicitQueueItem]   = List(),
+  favorites     : List[VideoLink]           = List(),
+  history       : List[PlayHistoryItem]     = List()
+)
+
+case class PlayHistoryItem(
+  videoLink: VideoLink,
+  watched:   Date
+)
+
+case class AutoQueueItem(
+  path:      String,
+  dateAdded: Date
+)
+
+case class ExplicitQueueItem(
+  videoId:   String,
+  dateAdded: Date
 )
 
 class Profile(json: DatabaseProfile) {
-  val profileId : String = json.profileId
-  var name      : String = json.name
+  val profileId     : String                  = json.profileId
+  var name          : String                  = json.name
+  var autoQueue     : List[AutoQueueItem]     = json.autoQueue
+  var explicitQueue : List[ExplicitQueueItem] = json.explicitQueue
+  var favorites     : List[VideoLink]         = json.favorites
+  var history       : List[PlayHistoryItem]   = json.history
 
   def toDatabase: DatabaseProfile = {
     DatabaseProfile(
@@ -46,6 +71,12 @@ trait ProfilesComponent extends Lifecycle { this: ProfileDatabaseComponent =>
 
     private def save(profile: Profile) {
       db.putProfile(profile.toDatabase)
+    }
+
+    def get(profileId: String): Option[Profile] = {
+      lock {
+        profiles.get(profileId)
+      }
     }
 
     def edit(profile: Profile, name: String) {

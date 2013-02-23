@@ -4,8 +4,7 @@
     "webroot":  "webui",
     "directories": [
         { "id": "1", "name": "Movies",          "path": "/Users/Brian/Movies"      },
-        { "id": "2", "name": "Drobo Video",     "path": "/Volumes/Public/video"    },
-        { "id": "2", "name": "Drobo Incoming",  "path": "/Volumes/Public/incoming" }
+        { "id": "3", "name": "Drobo Incoming",  "path": "/Volumes/Public/incoming" }
     ],
     "extensions": [ ".mkv", ".avi", ".mp4" ]
 }

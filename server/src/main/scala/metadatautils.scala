@@ -19,6 +19,8 @@ object MetadataUtils {
   // Try to extract season/episode numbers from stuff
   //
   lazy val seasonEpisode = List(
+    """season (\d+),? episode (\d+)""",            // season 7 episode 1
+    """season (\d+) - episode (\d+)""",            // season 7 episode 1
     """(?:^|[^\d])(\d+)x(\d+)(?:$|[^\d])""",       // 02x03, 2x3, etc
     """(?:^|[^\d])(\d+)x(\d+)(?:$|[^\d])""",       // 02x03, 2x3, etc
     """s(\d+)e(\d+)""",                            // S04E02, S4E3, S04E02, etc.
@@ -27,8 +29,6 @@ object MetadataUtils {
     """s(\d+)\.e(\d+)""",                          // S04.E02, etc.
     """(?:^|[^\d])(\d)(\d\d)(?:$|[^\d])""",        // 102
     """(?:^|[^\d])(0\d)(\d\d)(?:$|[^\d])""",       // 0102
-    """season (\d+),? episode (\d+)""",            // season 7 episode 1
-    """season (\d+) - episode (\d+)""",            // season 7 episode 1
     """[^\.\d](\d+)\.(\d+)[^\.\d]"""               // 1.2, 1.02
   )
   lazy val bracketedSeasonEpisode = seasonEpisode.map("""\[""" + _ + """\]""")
@@ -153,6 +153,8 @@ object MetadataUtils {
                                             .clean(". .", ".")
                                             .clean("..", ".")
                                             .clean(".", " ")
+                                            .clean("{§érìé§}", "")      // ugh..scene junk at beginning
+                                            .clean("aaf -", "")         // ugh..scene junk at beginning
                                             .cleanSuffix(junkStrings)
                                             .cleanPrefix(junkStrings)
                                             .clean("  ", " ")

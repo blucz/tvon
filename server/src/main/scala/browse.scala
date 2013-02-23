@@ -2,6 +2,7 @@ package tvon.server
 
 import java.net.URLEncoder
 import Extensions._
+import scala.collection.mutable._
 
 trait BrowseKeyDatabaseComponent  { val db: BrowseKeyDatabase  }
 trait BrowseKeyDatabase extends Database {
@@ -10,16 +11,17 @@ trait BrowseKeyDatabase extends Database {
 }
 
 case class ApiBrowseAction(name: String, action: String)
+case class ApiBrowseMetadata(label: String, value: String)
 
 case class ApiBrowseItem(
   path:          String,
   title:         String,
-  subtitle:      String                   = "",
+  subtitles:     List[String]             = List[String](),
+  metadata:      List[ApiBrowseMetadata]  = List[ApiBrowseMetadata](),
   technical:     String                   = "",
   canHaveImage:  Boolean                  = false,
   image:         Option[String]           = None,
-  actions:       List[ApiBrowseAction]    = List[ApiBrowseAction](),
-  video:         Option[ApiVideoLite]     = None
+  actions:       List[ApiBrowseAction]    = List[ApiBrowseAction]()
 )
 
 case class ApiBrowseLevel(
@@ -32,9 +34,7 @@ case class BrowseParameters(
   screenId:  Option[String],
   profileId: Option[String]
 ) {
-  def withPath(newpath: String): BrowseParameters = {
-    BrowseParameters(newpath, screenId, profileId)
-  }
+  def toQueryParameters: QueryParameters = QueryParameters(screenId = screenId, profileId = profileId)
 }
 
 //
@@ -46,7 +46,7 @@ case class BrowseParameters(
 //     /movies/decades/1990s  =
 
 trait BrowserComponent { 
-  this: CollectionComponent with ProfilesComponent with BrowseKeyDatabaseComponent =>
+  this: CollectionComponent with ProfilesComponent with QueryComponent with BrowseKeyDatabaseComponent =>
   val browser = new Browser
 
   class Browser {
@@ -62,7 +62,7 @@ trait BrowserComponent {
 
     private def browse_filters(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
       val items = List[ApiBrowseItem](
-        ApiBrowseItem(path = "/movies/recentlyadded", title = s"Recently Added"),
+        ApiBrowseItem(path = "/movies/recent/30",     title = s"Recently Added"),
         ApiBrowseItem(path = "/movies",               title = s"All"),
         ApiBrowseItem(path = "/movies/decades",       title = s"Decades"),    
         //ApiBrowseItem(path = "/movies/actors",        title = s"Actors"),           disabled because slow in browser..need alphanav
@@ -84,11 +84,6 @@ trait BrowserComponent {
       }
     }
 
-    // select a list of videos that fall within a path
-    def select(params: BrowseParameters): (List[Video],List[String]) = {
-      select(params, params.path.split('/').filter(_ != "").toList)
-    }
-
     private def join(a:String, b:String) = a + "/" + b
 
     private def videoSubtitle(video: Video): String = {
@@ -99,11 +94,19 @@ trait BrowserComponent {
           case es          => es mkString ", "
         }
         val s = video.season getOrElse "?"
-        val t = video.episodeTitle.map(" - " + _) getOrElse ""
-        s"Season ${s}, Episode ${e}${t}"
+        s"Season ${s}, Episode ${e}"
       } else {
-        video.year.map(_.toString) getOrElse ""
+        yearRuntimeString(video) getOrElse ""
       }
+    }
+
+    def yearRuntimeString(video: Video): Option[String] = {
+        (video.year,video.runtime) match {
+          case (None,None)                => None
+          case (Some(year),None)          => Some(year.toString)
+          case (None,Some(runtime))       => Some(runtime)
+          case (Some(year),Some(runtime)) => Some(year.toString + ", " + runtime)
+        }
     }
 
     def getImageUrl(url: Option[String]) = url.map("/images?url=" + URLEncoder.encode(_, "utf8"))
@@ -122,14 +125,21 @@ trait BrowserComponent {
 
       val item     = ApiBrowseItem(path = params.path, title = s"${videos.length} Results")
       val sortedvideos = videos.sorted(VideoOrdering)
+
       val items = sortedvideos.map(video => ApiBrowseItem(
-        path         = join("videos", video.videoId),
-        title        = video.title,
-        subtitle     = videoSubtitle(video),
+        path         = join("/videos", video.videoId),
+        title        = video.episodeTitle getOrElse video.title,
+        subtitles    = List(videoSubtitle(video)),
         canHaveImage = true,
         image        = getImageUrl(video.image),
         technical    = video.path.toString,
-        video        = Some(video.toApiLite)
+        metadata     = {
+          var metadata = ArrayBuffer[ApiBrowseMetadata]()
+          if (video.actors.length    > 0) metadata += ApiBrowseMetadata("Starring: ", video.actors.take(4).map(_.name) mkString ", ")
+          if (video.directors.length > 0) metadata += ApiBrowseMetadata("Directed By: ", video.directors.take(4).map(_.name) mkString ", ")
+          if (video.writers.length   > 0) metadata += ApiBrowseMetadata("Written By: ",  video.writers.take(4).map(_.name)   mkString ", ")
+          metadata.toList
+        }
       ))
       finishBrowse(items)
     }
@@ -174,7 +184,16 @@ trait BrowserComponent {
           ApiBrowseItem(path         = join(params.path, "seasons/" + season.toString), 
                         title        = s"Season ${season}",
                         canHaveImage = true,
-                        image        = getImageUrl(videos(0).image))
+                        image        = getImageUrl(videos(0).image),
+                        metadata     = {
+                          val video = videos(0)
+                          var metadata = ArrayBuffer[ApiBrowseMetadata]()
+                          if (video.actors.length    > 0) metadata += ApiBrowseMetadata("Starring: ", video.actors.take(4).map(_.name) mkString ", ")
+                          if (video.directors.length > 0) metadata += ApiBrowseMetadata("Directed By: ", video.directors.take(4).map(_.name) mkString ", ")
+                          if (video.writers.length   > 0) metadata += ApiBrowseMetadata("Written By: ",  video.writers.take(4).map(_.name)   mkString ", ")
+                          metadata.toList
+                        }
+                       )
       )
       finishBrowse(items)
     }
@@ -184,7 +203,16 @@ trait BrowserComponent {
           ApiBrowseItem(path         = join(params.path, db.stringToKey(video.title)), 
                         title        = video.show.get.name,
                         canHaveImage = true,
-                        image        = getImageUrl(video.image))
+                        image        = getImageUrl(video.image),
+                        subtitles    = yearRuntimeString(video).toList,
+                        metadata     = {
+                          var metadata = ArrayBuffer[ApiBrowseMetadata]()
+                          if (video.actors.length    > 0) metadata += ApiBrowseMetadata("Starring: ", video.actors.take(4).map(_.name) mkString ", ")
+                          if (video.directors.length > 0) metadata += ApiBrowseMetadata("Directed By: ", video.directors.take(4).map(_.name) mkString ", ")
+                          if (video.writers.length   > 0) metadata += ApiBrowseMetadata("Written By: ",  video.writers.take(4).map(_.name)   mkString ", ")
+                          metadata.toList
+                        }
+                       )
       )
       finishBrowse(items)
     }
@@ -197,7 +225,7 @@ trait BrowserComponent {
     }
 
     private def browse(params: BrowseParameters, fullpath: List[String], invideos: List[Video]): Option[ApiBrowseLevel] = {
-      val (videos, path) = select(params, fullpath, invideos)
+      val (videos, path) = query.select(params.toQueryParameters, fullpath, invideos)
       path match {
         case Nil                => browse_videos(params, videos)             
         case "countries"::Nil   => browse_countries(params, videos)          
@@ -209,44 +237,6 @@ trait BrowserComponent {
         case "shows"::Nil       => browse_shows(params, videos)
         case "filters"::Nil     => browse_filters(params, videos)
         case _                  => None
-      }
-    }
-
-    private def count(params: BrowseParameters) {
-      val (videos, path) = select(params)
-      videos.length
-    }
-
-    private def select(params: BrowseParameters, path: List[String]): (List[Video],List[String]) = {
-      select(params, path, collection.allVideos.toList)
-    }
-
-    private def select(params: BrowseParameters, path: List[String], videos: List[Video]): (List[Video],List[String]) = {
-      object ParseInt {
-        def unapply(s:String) : Option[Int] = {
-          try   { Some(s.toInt)                        }   
-          catch { case e:NumberFormatException => None }
-        }
-      }
-
-      object ParseKey {
-        def unapply(s:String) : Option[String] = db.keyToString(s)
-      }
-
-      path match {
-        case Nil                                  => (videos,List[String]())
-        case "movies"::tl                         => select(params, tl, videos.filter(_.isMovie))
-        case "tv"::tl                             => select(params, tl, videos.filter(_.isTv))
-        case "other"::tl                          => select(params, tl, videos.filter(_.isOther))
-        case "decades"::ParseInt(decade)::tl      => select(params, tl, videos.filter(_.matchesDecade(decade)))
-        case "seasons"::ParseInt(season)::tl      => select(params, tl, videos.filter(_.matchesSeason(season)))
-        case "shows"::ParseKey(show)::tl          => select(params, tl, videos.filter(_.matchesShow(show)))
-        case "directors"::ParseKey(director)::tl  => select(params, tl, videos.filter(_.matchesDirector(director)))
-        case "actors"::ParseKey(actor)::tl        => select(params, tl, videos.filter(_.matchesActor(actor)))
-        case "genres"::ParseKey(genre)::tl        => select(params, tl, videos.filter(_.matchesGenre(genre)))
-        case "countries"::ParseKey(country)::tl   => select(params, tl, videos.filter(_.matchesCountry(country)))
-        case "videos"::videoId::tl                => select(params, tl, videos.filter(_.videoId == videoId))
-        case other                                => (videos, other) 
       }
     }
   }
