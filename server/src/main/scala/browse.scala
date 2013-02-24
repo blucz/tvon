@@ -225,10 +225,10 @@ trait BrowserComponent {
           technical    = video.path.toString,
           metadata     = {
             var metadata = ArrayBuffer[ApiBrowseMetadata]()
-            if (!video.rating.isEmpty) metadata += ApiBrowseMetadata("IMDB Rating: ", video.rating.map(_.toString).get)
             if (video.actors.length    > 0) metadata += ApiBrowseMetadata("Starring: ", video.actors.take(4).map(_.name) mkString ", ")
             if (video.directors.length > 0) metadata += ApiBrowseMetadata("Directed By: ", video.directors.take(4).map(_.name) mkString ", ")
             if (video.writers.length   > 0) metadata += ApiBrowseMetadata("Written By: ",  video.writers.take(4).map(_.name)   mkString ", ")
+            if (!video.rating.isEmpty) metadata += ApiBrowseMetadata("Rating: ", video.rating.map(_.toString).get)
             metadata.toList
           }
         ))
@@ -250,10 +250,10 @@ trait BrowserComponent {
         description = video.plot,
         metadata     = {
           var metadata = ArrayBuffer[ApiBrowseMetadata]()
-          if (!video.rating.isEmpty) metadata += ApiBrowseMetadata("IMDB Rating: ", video.rating.map(_.toString).get)
           if (video.actors.length    > 0) metadata += ApiBrowseMetadata("Starring: ", video.actors.map(_.name) mkString ", ")
           if (video.directors.length > 0) metadata += ApiBrowseMetadata("Directed By: ", video.directors.map(_.name) mkString ", ")
           if (video.writers.length   > 0) metadata += ApiBrowseMetadata("Written By: ",  video.writers.map(_.name)   mkString ", ")
+          if (!video.rating.isEmpty) metadata += ApiBrowseMetadata("Rating: ", video.rating.map(_.toString).get)
           metadata.toList
         }
       ))
@@ -273,10 +273,10 @@ trait BrowserComponent {
         description = video.plot,
         metadata    = {
           var metadata = ArrayBuffer[ApiBrowseMetadata]()
-          if (!video.rating.isEmpty) metadata += ApiBrowseMetadata("IMDB Rating: ", video.rating.map(_.toString).get)
           if (video.actors.length    > 0) metadata += ApiBrowseMetadata("Starring: ", video.actors.map(_.name) mkString ", ")
           if (video.directors.length > 0) metadata += ApiBrowseMetadata("Directed By: ", video.directors.map(_.name) mkString ", ")
           if (video.writers.length   > 0) metadata += ApiBrowseMetadata("Written By: ",  video.writers.map(_.name)   mkString ", ")
+          if (!video.rating.isEmpty) metadata += ApiBrowseMetadata("Rating: ", video.rating.map(_.toString).get)
           metadata.toList
         }
       ))
