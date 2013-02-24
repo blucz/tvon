@@ -108,6 +108,38 @@ object Extensions {
   }
 
   implicit class RichIterable[A](i: Iterable[A]) {
+    def tryMinBy[B](picker: (A) => Option[B])(implicit cmp:Ordering[B]): Option[B] = {
+      var ret : Option[B] = None
+      for (a <- i) {
+        picker(a) match {
+          case Some(b) =>
+            ret = ret match {
+              case None                      => Some(b)
+              case Some(bb) if cmp.lt(b, bb) => Some(b)
+              case Some(bb)                  => Some(bb)
+            }
+            case None =>
+        }
+      }
+      ret
+    }
+
+    def tryMaxBy[B](picker: (A) => Option[B])(implicit cmp:Ordering[B]): Option[B] = {
+      var ret : Option[B] = None
+      for (a <- i) {
+        picker(a) match {
+          case Some(b) =>
+            ret = ret match {
+              case None                      => Some(b)
+              case Some(bb) if cmp.gt(b, bb) => Some(b)
+              case Some(bb)                  => Some(bb)
+            }
+            case None =>
+        }
+      }
+      ret
+    }
+
     def tryPick[B](picker: (A) => Option[B]) : Option[B] = {
       for (a <- i) {
         picker(a) match {

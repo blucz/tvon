@@ -43,9 +43,8 @@ function BrowseController($scope, $rootScope) {
             $scope.$apply(function(){ 
                 $scope.level.is_loading = false
                 if (data.status == "success") {
-                    $scope.level.items = data.value.items
-                    $scope.level.video = data.value.video
-                    $scope.level.exists = true
+                    for (i in data.value) { $scope.level[i] = data.value[i] }
+                    $scope.level.exists  = true
                     console.log($scope.level)
                 }
                 refresh();
@@ -62,6 +61,21 @@ function BrowseController($scope, $rootScope) {
             $scope.levels.pop()
             refresh()
         }
+    }
+    $scope.doaction = function(action) {
+        console.log(action)
+        var data = { action: action.action }
+        if ($rootScope.profile != undefined) data.profileId = $rootScope.profile.profileId
+        if ($rootScope.screen  != undefined) data.screenId  = $rootScope.screen.screenId
+        $.ajax(GET("/api/browse/" + action.path, data)).done(function(data) {
+            $scope.$apply(function(){ 
+                if (data.status == "success") {
+                    for (i in data.value) { $scope.level[i] = data.value[i] }
+                    console.log($scope.level)
+                }
+                refresh();
+            })
+        })
     }
 
     $scope.browse({ title: 'Browse'}, '')

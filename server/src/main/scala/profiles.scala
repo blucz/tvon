@@ -11,12 +11,12 @@ trait ProfileDatabase extends Database {
 }
 
 case class DatabaseProfile(
-  profileId     : String,
-  name          : String,
-  autoQueue     : List[AutoQueueItem]       = List(),
-  explicitQueue : List[ExplicitQueueItem]   = List(),
-  favorites     : List[VideoLink]           = List(),
-  history       : List[PlayHistoryItem]     = List()
+  profileId       : String,
+  name            : String,
+  autoQueue       : List[AutoQueueItem]       = List(),
+  explicitQueue   : List[ExplicitQueueItem]   = List(),
+  explicitUnqueue : List[ExplicitQueueItem]   = List(),
+  history         : List[PlayHistoryItem]     = List()
 )
 
 case class PlayHistoryItem(
@@ -35,17 +35,21 @@ case class ExplicitQueueItem(
 )
 
 class Profile(json: DatabaseProfile) {
-  val profileId     : String                  = json.profileId
-  var name          : String                  = json.name
-  var autoQueue     : List[AutoQueueItem]     = json.autoQueue
-  var explicitQueue : List[ExplicitQueueItem] = json.explicitQueue
-  var favorites     : List[VideoLink]         = json.favorites
-  var history       : List[PlayHistoryItem]   = json.history
+  val profileId       : String                  = json.profileId
+  var name            : String                  = json.name
+  var autoQueue       : List[AutoQueueItem]     = json.autoQueue
+  var explicitQueue   : List[ExplicitQueueItem] = json.explicitQueue
+  var explicitUnqueue : List[ExplicitQueueItem] = json.explicitUnqueue
+  var history         : List[PlayHistoryItem]   = json.history
 
   def toDatabase: DatabaseProfile = {
     DatabaseProfile(
-      profileId   = profileId,
-      name        = name
+      profileId       = profileId,
+      name            = name,
+      autoQueue       = autoQueue,
+      explicitQueue   = explicitQueue, 
+      explicitUnqueue = explicitUnqueue, 
+      history         = history
     )
   }
 
@@ -68,6 +72,8 @@ trait ProfilesComponent extends Lifecycle { this: ProfileDatabaseComponent =>
 
   class Profiles extends Lock { 
     var profiles = Map[String,Profile]()
+
+    def allProfiles: List[Profile] = lock { profiles.values.toList }
 
     private def save(profile: Profile) {
       db.putProfile(profile.toDatabase)

@@ -67,6 +67,7 @@ case class VideoLink(
 )
 
 trait VideoEnvironment {
+  def isQueued(profile: Profile, video: Video): Boolean
   def getImageUrl(s:Option[String]): Option[String]
   def isBackendOnline(storageBackendId: String): Boolean
   def getCountry(name: String): Country 
@@ -259,7 +260,7 @@ class Video(env: VideoEnvironment, json: DatabaseVideo) {
   }
 
   def isWatched (profile: Profile): Boolean = profile.history.exists(item => matchesLink(item.videoLink))
-  def isFavorite(profile: Profile): Boolean = profile.favorites.exists(item => matchesLink(item))
+  def isQueued  (profile: Profile): Boolean = env.isQueued(profile, this)
 
   def watchedSince(profile: Profile, date: Date) = {
     profile.history.exists(item => matchesLink(item.videoLink) && item.watched.after(date))

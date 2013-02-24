@@ -274,19 +274,19 @@ a:hover {
 .details .title {
     font-size: 17pt;
     margin-top: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     font-weight: bold;
 }
 .details .label {
     color: #666;
 }
 .details .subsubtitle {
-    font-size: 11pt;
-    margin-bottom: 6px;
+    font-size: 10pt;
+    margin-bottom: 8px;
 }
 .details .subtitle {
     font-size: 13pt;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 .details .technical {
     font-size: 11pt;
@@ -295,9 +295,9 @@ a:hover {
 .details .right {
     padding-left: 12px;
 }
-.details .plot {
-    margin-top: 12px;
-    font-size: 11pt;
+.details .description {
+    margin-top: 8px;
+    font-size: 10pt;
 }
 .details .technical {
     position: absolute;
@@ -305,3 +305,36 @@ a:hover {
     left:0px;
     font-color: #999;
 }
+
+.abovelist {
+    margin: 0px;
+    border-bottom: 2px solid #aaa;
+    padding-bottom: 8px;
+}
+
+/* actions */
+.actions {
+    color: #666;
+    margin: 0px;
+}
+.action {
+    border: 1px solid #aaa;
+    -webkit-border-radius: 8px;
+    font-size: 13pt;
+    padding: 8px;
+    margin-bottom: 8px;
+    margin-top: 8px;
+    margin-right: 8px;
+    background: #ddd;
+    background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #f4f5f5), color-stop(100%, #dfdddd));
+    background-image: -webkit-linear-gradient(top, #f4f5f5, #dfdddd);
+    border:1px solid #d7dada; -webkit-border-radius: 3px;
+    min-width: 100px;
+}
+.action img {
+    height: 18px;
+    width: 18px;
+    margin-right: 8px;
+    display: block;
+}
+.action .text { }

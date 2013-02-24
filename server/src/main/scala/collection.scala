@@ -3,6 +3,7 @@ package tvon.server
 import scala.collection.mutable._
 import java.util.Date
 import java.nio.file._
+import Extensions._
 
 trait CollectionDatabaseComponent { val db: CollectionDatabase }
 trait CollectionDatabase extends Database {
@@ -13,7 +14,7 @@ trait CollectionDatabase extends Database {
 }
 
 trait CollectionComponent extends Lifecycle with Lock { 
-  this: CollectionDatabaseComponent with MetadataLookupComponent with BrowserComponent =>
+  this: CollectionDatabaseComponent with MetadataLookupComponent with BrowserComponent with ProfilesComponent with QueryComponent =>
   val collection: Collection = new Collection
 
   override def init() {
@@ -28,12 +29,65 @@ trait CollectionComponent extends Lifecycle with Lock {
   class Collection {
     private val videos                  = new HashMap[String,Video]
     private val onlineStorageBackendIds = new HashSet[String]
+    private val queues                  = new HashMap[Profile, HashSet[Video]]()
 
     def init() {
       for (json <- db.loadVideos()) {
         videos(json.videoId) = new Video(env, json)
       }
       Log.info(s"[collection] loaded ${videos.size} existing files")
+    }
+
+    private def queueWantsVideo(profile: Profile, video: Video): Boolean = {
+      val params              = new QueryParameters(profileId = Some(profile.profileId))
+      val lastWatchedDate     =         profile.history.tryMaxBy(item => if (video.matchesLink(item.videoLink)) Some(item.watched)   else None)
+      val explicitQueueDate   =   profile.explicitQueue.tryMaxBy(item => if (video.videoId == item.videoId)     Some(item.dateAdded) else None)
+      val explicitUnqueueDate = profile.explicitUnqueue.tryMaxBy(item => if (video.videoId == item.videoId)     Some(item.dateAdded) else None)
+      val autoQueueDate       = profile.autoQueue.tryMinBy(item => {
+        if (query.matches(params, item.path, video) && video.dateAdded.after(item.dateAdded))
+          Some(item.dateAdded)
+        else
+          None
+      })
+      val lastQueuedDate   = List(autoQueueDate, explicitQueueDate).tryMaxBy(i=>i) 
+      val lastUnqueuedDate = List(lastWatchedDate, explicitUnqueueDate).tryMaxBy(i=>i)
+      (lastQueuedDate,lastUnqueuedDate) match {
+        case (None,       None)  => false
+        case (Some(_),    None)  => true
+        case (None,    Some(_))  => false
+        case (Some(q), Some(uq)) => q.after(uq)
+      }
+    }
+
+    def getQueue(profileId: String): List[Video] = lock { 
+      profiles.get(profileId) match {
+        case None          => List()
+        case Some(profile) => queues.get(profile) match {
+          case None    => List()
+          case Some(l) => l.toList
+        }
+      }
+    }
+
+    private def updateQueues(video: Video) {
+      for (profile <- profiles.allProfiles) {
+        val queue: HashSet[Video] = queues.get(profile) match {
+          case Some(queue) => queue
+          case None        => val queue = new HashSet[Video]()
+                              queues(profile) = queue
+                              queue
+        }
+        if (queueWantsVideo(profile, video)) {
+          queue.add(video)
+        } else {
+          queue.remove(video)
+        }
+      }
+    }
+
+    private def save(video: Video) {
+      db.putVideo(video.toDatabase)
+      updateQueues(video)
     }
 
     // public API
@@ -63,7 +117,12 @@ trait CollectionComponent extends Lifecycle with Lock {
       def isBackendOnline(storageBackendId: String): Boolean = lock {
         onlineStorageBackendIds.contains(storageBackendId)
       }
-
+      def isQueued(profile: Profile, video: Video): Boolean = lock {
+        queues.get(profile) match {
+          case None        => false
+          case Some(queue) => queue.contains(video)
+        }
+      }
       def getCountry (name: String): Country  = lock { getImmutable(countries, name, new Country(_))  }
       def getDirector(name: String): Director = lock { getImmutable(directors, name, new Director(_)) }
       def getActor   (name: String): Actor    = lock { getImmutable(actors,    name, new Actor(_))    }
@@ -72,7 +131,6 @@ trait CollectionComponent extends Lifecycle with Lock {
       def getGenre   (name: String): Genre    = lock { getImmutable(genres,    name, new Genre(_))    }
       def getShow    (name: String): Show     = lock { getImmutable(shows,     name, new Show(_))     }
       def getImageUrl(url:  Option[String]): Option[String] = browser.getImageUrl(url)
-
       def loadIMDBMetadata(video: Video): Option[IMDBMetadata] = lock {
         metadatalookup.loadIMDBMetadata(video)
       }
@@ -80,6 +138,7 @@ trait CollectionComponent extends Lifecycle with Lock {
 
     def updateIMDBMetadata(video: Video, imdb: Option[IMDBMetadata]) { lock {
       video.updateIMDBMetadata(imdb)
+      updateQueues(video)
     } }
 
     private def makeDatabaseVideo(backend: StorageBackend, file: StorageFile): DatabaseVideo = {
@@ -93,10 +152,6 @@ trait CollectionComponent extends Lifecycle with Lock {
         deleted          = false,
         signature        = file.signature
       )
-    }
-
-    private def save(file: Video) {
-      db.putVideo(file.toDatabase)
     }
 
     private def tryFindVideo(storageBackendId: String, storageKey: String): Option[Video] = {

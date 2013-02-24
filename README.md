@@ -78,4 +78,6 @@ remote  - native on each platform
 - launch web gui for now? native copy of web gui later?
 
 
-
+TVon uses icons from:
+---------------------
+http://www.visualpharm.com/must_have_icon_set/

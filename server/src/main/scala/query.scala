@@ -5,8 +5,8 @@ import Extensions._
 import scala.collection.mutable._
 
 case class QueryParameters(
-  screenId:  Option[String],
-  profileId: Option[String]
+  screenId:  Option[String] = None,
+  profileId: Option[String] = None
 )
 
 //
@@ -31,18 +31,29 @@ trait QueryComponent {
       select(params, path, collection.allVideos.toList)
     }
 
+    def matches(params: QueryParameters, path: String, video: Video): Boolean = {
+      matches(params, path.split('/').filter(_ != "").toList, video)
+    }
+
+    def matches(params: QueryParameters, path: List[String], video: Video): Boolean = {
+      path match {
+        case Nil                                  => true
+        case "movies"::tl                         => if (video.isMovie)                   matches(params, tl, video) else false
+        case "tv"::tl                             => if (video.isTv)                      matches(params, tl, video) else false
+        case "other"::tl                          => if (video.isOther)                   matches(params, tl, video) else false
+        case "decades"::ParseInt(decade)::tl      => if (video.matchesDecade(decade))     matches(params, tl, video) else false
+        case "seasons"::ParseInt(season)::tl      => if (video.matchesSeason(season))     matches(params, tl, video) else false
+        case "shows"::ParseKey(show)::tl          => if (video.matchesShow(show))         matches(params, tl, video) else false
+        case "directors"::ParseKey(director)::tl  => if (video.matchesDirector(director)) matches(params, tl, video) else false
+        case "actors"::ParseKey(actor)::tl        => if (video.matchesActor(actor))       matches(params, tl, video) else false
+        case "genres"::ParseKey(genre)::tl        => if (video.matchesGenre(genre))       matches(params, tl, video) else false
+        case "countries"::ParseKey(country)::tl   => if (video.matchesCountry(country))   matches(params, tl, video) else false
+        case "videos"::videoId::tl                => if (video.videoId == videoId)        matches(params, tl, video) else false
+        case other                                => false
+      }
+    }
+
     def select(params: QueryParameters, path: List[String], videos: List[Video]): (List[Video],List[String]) = {
-      object ParseInt {
-        def unapply(s:String) : Option[Int] = {
-          try   { Some(s.toInt)                        }   
-          catch { case e:NumberFormatException => None }
-        }
-      }
-
-      object ParseKey {
-        def unapply(s:String) : Option[String] = db.keyToString(s)
-      }
-
       path match {
         case Nil                                  => (videos,List[String]())
         case "recent"::ParseInt(n)::tl            => select(params, tl, videos.sortBy(_.dateAdded).reverse.take(n))
@@ -57,37 +68,19 @@ trait QueryComponent {
         case "genres"::ParseKey(genre)::tl        => select(params, tl, videos.filter(_.matchesGenre(genre)))
         case "countries"::ParseKey(country)::tl   => select(params, tl, videos.filter(_.matchesCountry(country)))
         case "videos"::videoId::tl                => select(params, tl, videos.filter(_.videoId == videoId))
-        case "queue"::tl                          => 
-          profiles.get(params.profileId getOrElse "") match {
-            case None          => (List(),tl)
-            case Some(profile) =>
-              val ret = new HashSet[Video]
-
-              // Process the explicit queue
-              for (item <- profile.explicitQueue) {
-                collection.getVideo(item.videoId) match {
-                  case None        => 
-                  case Some(video) => 
-                    if (!video.watchedSince(profile, item.dateAdded)) {
-                      ret.add(video)
-                    }
-                }
-              }
-
-              // Process the auto-add queue
-              for (item <- profile.autoQueue) {
-                for (video <- select(params, item.path)._1) {
-                  if (video.dateAdded.after(item.dateAdded) && !video.watchedSince(profile, item.dateAdded)) {
-                    ret.add(video)
-                  }
-                }
-              }
-
-              // return results
-              (ret.toList, tl)
-          }
         case other                                => (videos, other) 
       }
+    }
+
+    object ParseInt {
+      def unapply(s:String) : Option[Int] = {
+        try   { Some(s.toInt)                        }   
+        catch { case e:NumberFormatException => None }
+        }
+      }
+
+      object ParseKey {
+        def unapply(s:String) : Option[String] = db.keyToString(s)
     }
   }
 }

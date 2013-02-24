@@ -10,7 +10,12 @@ trait BrowseKeyDatabase extends Database {
     def stringToKey(s:String): String
 }
 
-case class ApiBrowseAction(name: String, icon: Option[String], action: String)
+case class ApiBrowseAction(
+  name:     String, 
+  icon:     String, 
+  action:   String,
+  path:     Option[String]
+)
 case class ApiBrowseMetadata(label: String, value: String)
 
 case class ApiBrowseItem(
@@ -20,13 +25,20 @@ case class ApiBrowseItem(
   metadata:      List[ApiBrowseMetadata]  = List[ApiBrowseMetadata](),
   technical:     String                   = "",
   canHaveImage:  Boolean                  = false,
-  image:         Option[String]           = None,
-  actions:       List[ApiBrowseAction]    = List[ApiBrowseAction]()
+  image:         Option[String]           = None
 )
 
 case class ApiBrowseLevel(
-  items: List[ApiBrowseItem] = List[ApiBrowseItem](),
-  video: Option[ApiVideo]    = None
+  // for displaying data at the top
+  actions:       List[ApiBrowseAction] = List[ApiBrowseAction](),
+  title:         Option[String]           = None,
+  subtitles:     List[String]             = List[String](),
+  metadata:      List[ApiBrowseMetadata]  = List[ApiBrowseMetadata](),
+  image:         Option[String]           = None,
+  description:   Option[String]           = None,
+
+  // items
+  items:         List[ApiBrowseItem]   = List[ApiBrowseItem]()
 )
 
 case class BrowseParameters(
@@ -80,21 +92,25 @@ trait BrowserComponent {
       if (comps.length == 0) {
         browse_root(params)
       } else {
-        browse(params, comps, collection.allVideos.toList)
+        browse(params, comps, collection.availableVideos.toList)
       }
     }
 
     private def join(a:String, b:String) = a + "/" + b
 
-    private def videoSubtitle(video: Video): String = {
+    private def videoSubtitle(video: Video, oneseason: Boolean): String = {
       if (video.isTv) {
         val e = video.episodes match {
           case Nil         => "?"
           case e1::e2::Nil => s"${e1}-${e2}"
           case es          => es mkString ", "
         }
-        val s = video.season getOrElse "?"
-        s"Season ${s}, Episode ${e}"
+        if (oneseason) {
+          s"Episode ${e}"
+        } else {
+          val s = video.season getOrElse "?"
+          s"Season ${s}, Episode ${e}"
+        }
       } else {
         yearRuntimeString(video) getOrElse ""
       }
@@ -111,37 +127,159 @@ trait BrowserComponent {
 
     def getImageUrl(url: Option[String]) = url.map("/images?url=" + URLEncoder.encode(_, "utf8"))
 
+    private def getVideoActions(params: BrowseParameters, video: Video): List[ApiBrowseAction] = {
+      val profileopt = params.profileId.map(profiles.get(_)).map(_.get)
+      var ret = new ArrayBuffer[ApiBrowseAction]
+      ret.append(ApiBrowseAction(
+        name   = "Play",
+        action = "play",
+        icon   = "images/play.png",
+        path   = Some(join("/videos", video.videoId))
+      ))
+      profileopt match {
+        case None => 
+        case Some(profile) =>
+          if (video.isQueued(profile)) {
+            ret.append(ApiBrowseAction(
+              name   = "Remove from Queue",
+              action = "removefromqueue",
+              icon   = "images/remove.png",
+              path   = Some(join("/videos", video.videoId))
+            ))
+          } else {
+            ret.append(ApiBrowseAction(
+              name   = "Add to Queue",
+              action = "addtoqueue",
+              icon   = "images/add.png",
+              path   = Some(join("/videos", video.videoId))
+            ))
+          }
+      }
+      ret.toList
+    }
+
+    private def getVideoListActions(params: BrowseParameters): List[ApiBrowseAction] = {
+      val profileopt = params.profileId.map(profiles.get(_)).map(_.get)
+      var ret = new ArrayBuffer[ApiBrowseAction]
+      profileopt match {
+        case None => 
+        case Some(profile) => 
+          ret.append(ApiBrowseAction(
+            name   = "Add to queue",
+            action = "addtoqueue",
+            icon   = "images/add.png",
+            path   = Some(params.path)
+          ))
+
+          if (profile.autoQueue.exists(_.path == params.path)) {
+            ret.append(ApiBrowseAction(
+              name   = "Auto-Queue new items",
+              action = "disableautoadd",
+              icon   = "images/check.png",
+              path   = Some(params.path)
+            ))
+          } else {
+            ret.append(ApiBrowseAction(
+              name   = "Auto-Queue new items",
+              action = "enableautoadd",
+              icon   = "images/uncheck.png",
+              path   = Some(params.path)
+            ))
+          }
+      }
+      ret.toList
+    }
+
     private def browse_videos(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
+      // no videos, return notfound
       if (videos.length == 0) { return None }
 
-      if (videos.forall(video => video.show == videos(0).show) && videos.map(_.season).distinct.length != 1) {
-        // we have all the same show, but multiple seasons, so insert new browse level
+      // this list contains exactly one video, just show it
+      if (videos.length == 1) {
+        return finishVideoBrowse(videos.head, getVideoActions(params, videos.head))
+      }
+
+      // we have all the same show, but multiple seasons, so insert new browse level to choose a season
+      val oneshow   = videos.forall(video => video.show   == videos(0).show)   && !videos(0).show.isEmpty
+      val oneseason = videos.forall(video => video.season == videos(0).season) && !videos(0).season.isEmpty
+      if (oneshow && videos.map(_.season).distinct.length != 1) {
         return browse_seasons(params, videos)
       }
-
-      if (videos.length == 1) {
-        return finishBrowse(videos.head.toApi)
-      }
-
-      val item     = ApiBrowseItem(path = params.path, title = s"${videos.length} Results")
       val sortedvideos = videos.sorted(VideoOrdering)
 
-      val items = sortedvideos.map(video => ApiBrowseItem(
-        path         = join("/videos", video.videoId),
-        title        = video.episodeTitle getOrElse video.title,
-        subtitles    = List(videoSubtitle(video)),
-        canHaveImage = true,
+      val items = if (oneshow) {
+        sortedvideos.map(video => ApiBrowseItem(
+          path         = join("/videos", video.videoId),
+          title        = videoSubtitle(video, oneseason),
+          subtitles    = video.episodeTitle.toList,
+          canHaveImage = false,
+          technical    = video.path.toString
+        ))
+      } else {
+        sortedvideos.map(video => ApiBrowseItem(
+          path         = join("/videos", video.videoId),
+          title        = video.episodeTitle getOrElse video.title,
+          subtitles    = List(videoSubtitle(video, oneseason)),
+          canHaveImage = true,
+          image        = getImageUrl(video.image),
+          technical    = video.path.toString,
+          metadata     = {
+            var metadata = ArrayBuffer[ApiBrowseMetadata]()
+            if (!video.rating.isEmpty) metadata += ApiBrowseMetadata("IMDB Rating: ", video.rating.map(_.toString).get)
+            if (video.actors.length    > 0) metadata += ApiBrowseMetadata("Starring: ", video.actors.take(4).map(_.name) mkString ", ")
+            if (video.directors.length > 0) metadata += ApiBrowseMetadata("Directed By: ", video.directors.take(4).map(_.name) mkString ", ")
+            if (video.writers.length   > 0) metadata += ApiBrowseMetadata("Written By: ",  video.writers.take(4).map(_.name)   mkString ", ")
+            metadata.toList
+          }
+        ))
+      }
+
+      if (oneshow) {
+        finishShowBrowse(items, sortedvideos(0), getVideoListActions(params), oneseason)
+      } else {
+        finishBrowse(items)
+      }
+    }
+
+    private def finishVideoBrowse(video: Video, actions: List[ApiBrowseAction]): Option[ApiBrowseLevel] = {
+      Some(ApiBrowseLevel(
+        actions      = actions,
+        title        = Some(video.episodeTitle getOrElse video.title),
+        subtitles    = List(videoSubtitle(video, false)),
         image        = getImageUrl(video.image),
-        technical    = video.path.toString,
+        description = video.plot,
         metadata     = {
           var metadata = ArrayBuffer[ApiBrowseMetadata]()
-          if (video.actors.length    > 0) metadata += ApiBrowseMetadata("Starring: ", video.actors.take(4).map(_.name) mkString ", ")
-          if (video.directors.length > 0) metadata += ApiBrowseMetadata("Directed By: ", video.directors.take(4).map(_.name) mkString ", ")
-          if (video.writers.length   > 0) metadata += ApiBrowseMetadata("Written By: ",  video.writers.take(4).map(_.name)   mkString ", ")
+          if (!video.rating.isEmpty) metadata += ApiBrowseMetadata("IMDB Rating: ", video.rating.map(_.toString).get)
+          if (video.actors.length    > 0) metadata += ApiBrowseMetadata("Starring: ", video.actors.map(_.name) mkString ", ")
+          if (video.directors.length > 0) metadata += ApiBrowseMetadata("Directed By: ", video.directors.map(_.name) mkString ", ")
+          if (video.writers.length   > 0) metadata += ApiBrowseMetadata("Written By: ",  video.writers.map(_.name)   mkString ", ")
           metadata.toList
         }
       ))
-      finishBrowse(items)
+    }
+
+    private def finishShowBrowse(items: List[ApiBrowseItem], video: Video, actions: List[ApiBrowseAction], oneseason: Boolean): Option[ApiBrowseLevel] = {
+      val title = oneseason match {
+        case true  => video.title + ", Season " + video.season.get
+        case false => video.title
+      }
+      Some(ApiBrowseLevel(
+        items       = items, 
+        actions     = actions,
+        title       = Some(title), 
+        image       = getImageUrl(video.image),
+        subtitles   = yearRuntimeString(video).toList,
+        description = video.plot,
+        metadata    = {
+          var metadata = ArrayBuffer[ApiBrowseMetadata]()
+          if (!video.rating.isEmpty) metadata += ApiBrowseMetadata("IMDB Rating: ", video.rating.map(_.toString).get)
+          if (video.actors.length    > 0) metadata += ApiBrowseMetadata("Starring: ", video.actors.map(_.name) mkString ", ")
+          if (video.directors.length > 0) metadata += ApiBrowseMetadata("Directed By: ", video.directors.map(_.name) mkString ", ")
+          if (video.writers.length   > 0) metadata += ApiBrowseMetadata("Written By: ",  video.writers.map(_.name)   mkString ", ")
+          metadata.toList
+        }
+      ))
     }
 
     private def browse_decades(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
@@ -180,22 +318,14 @@ trait BrowserComponent {
     }
 
     private def browse_seasons(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
-      val items = videos.filter(!_.season.isEmpty).map(_.season.get).distinct.sorted.map(season =>
+      val filteredvideos = videos.filter(!_.season.isEmpty)
+      val video        = filteredvideos(0)
+      val items        = filteredvideos.map(_.season.get).distinct.sorted.map(season =>
           ApiBrowseItem(path         = join(params.path, "seasons/" + season.toString), 
-                        title        = s"Season ${season}",
-                        canHaveImage = true,
-                        image        = getImageUrl(videos(0).image),
-                        metadata     = {
-                          val video = videos(0)
-                          var metadata = ArrayBuffer[ApiBrowseMetadata]()
-                          if (video.actors.length    > 0) metadata += ApiBrowseMetadata("Starring: ", video.actors.take(4).map(_.name) mkString ", ")
-                          if (video.directors.length > 0) metadata += ApiBrowseMetadata("Directed By: ", video.directors.take(4).map(_.name) mkString ", ")
-                          if (video.writers.length   > 0) metadata += ApiBrowseMetadata("Written By: ",  video.writers.take(4).map(_.name)   mkString ", ")
-                          metadata.toList
-                        }
+                        title        = s"Season ${season}"
                        )
       )
-      finishBrowse(items)
+      finishShowBrowse(items, video, getVideoListActions(params), false)
     }
 
     private def browse_shows(params: BrowseParameters, videos: List[Video]): Option[ApiBrowseLevel] = {
@@ -217,11 +347,9 @@ trait BrowserComponent {
       finishBrowse(items)
     }
 
-    private def finishBrowse(video: ApiVideo): Option[ApiBrowseLevel] = Some(ApiBrowseLevel(video = Some(video)))
-
-    private def finishBrowse(items: List[ApiBrowseItem]): Option[ApiBrowseLevel] = items match {
+    private def finishBrowse(items: List[ApiBrowseItem], actions: List[ApiBrowseAction] = List()): Option[ApiBrowseLevel] = items match {
       case Nil => None
-      case _   => Some(ApiBrowseLevel(items = items))
+      case _   => Some(ApiBrowseLevel(items = items, actions = actions))
     }
 
     private def browse(params: BrowseParameters, fullpath: List[String], invideos: List[Video]): Option[ApiBrowseLevel] = {

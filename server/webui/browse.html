@@ -39,44 +39,36 @@
                 </div>
             </div>
 
-            <ng-switch on="level.video != null">
-                <div ng-switch-when='true' class='vbox alignstretch flex details'>
-                    <div class='hbox alignstretch'>
-                        <div class='left'>
-                            <img ng-show='level.video.image' width='240' src='{{level.video.image}}' alt='{{level.video.title}}'></img>
-                            <div ng-show='!level.video.image' class='bigplaceholder'></div>
-                        </div>
-                        <div class='right flex'>
-
-                            <div class='title' ng-show='!level.video'>{{level.title}}</div>
-                            <div class='subtitles' ng-repeat='subtitle in level.subtitles' ng-show='!level.video'>{{subtitle}}</div>
-
-                            <div class='title' ng-show='!level.video.episodeTitle'>{{level.video.title}}</div>
-                            <div class='title' ng-show='level.video.episodeTitle'>{{level.video.episodeTitle}}</div>
-
-                            <div class='subtitle' ng-show='level.video.season '>Season {{level.video.season}}, Episode {{level.video.episodes|join:"-"}}</div>
-
-                            <div class='subtitle'>
-                                <span ng-show='level.video.year'>{{level.video.year}}</span><span ng-show='level.video.year && level.video.runtime'>, </span>
-                                <span ng-show='level.video.runtime'>{{level.video.runtime}}</span>
-                            </div>
-
-                            <div class='subsubtitle' ng-show='level.video.writers.length > 0'>
-                                <span class='label'>Written by</span> {{level.video.writers|join}}
-                            </div>
-                            <div class='subsubtitle' ng-show='level.video.directors.length > 0'>
-                                <span class='label'>Directed by</span> {{level.video.directors|join}}
-                            </div>
-                            <div class='subsubtitle' ng-show='level.video.actors.length > 0'>
-                                <span class='label'>Starring</span> {{level.video.actors|join}}
-                            </div>
-                        </div>
+            <div ng-show="level.title != null" class='vbox alignstretch details'>
+                <div class='hbox alignstretch'>
+                    <div class='left'>
+                        <img ng-show='level.image' width='160' src='{{level.image}}' alt='{{level.title}}'></img>
+                        <div ng-show='!level.image' class='bigplaceholder'></div>
                     </div>
-                    <div class='plot' ng-show='level.video.plot' class='alignstretch flex'>
-                        <p>{{level.video.plot}}</p>
+                    <div class='right flex'>
+                        <div class='title'>{{level.title}}</div>
+                        <div class='subtitle' ng-repeat='subtitle in level.subtitles'>{{subtitle}}</div>
+
+                        <div class='hbox alignstretch actions'>
+                            <div ng-click='doaction(action)' ng-repeat='action in level.actions' class='hbox action clickable aligncenter packcenter'>
+                                <img src='{{action.icon}}' alt='{{action.name}}'></img>
+                                <div class='text'>{{action.name}}</div>
+                            </div>
+                        </div>
+
+                        <div class='subsubtitle' ng-repeat='metadata in level.metadata'>     
+                            <span class='label'>{{metadata.label}}</span> {{metadata.value}}
+                        </div>
                     </div>
                 </div>
-            </ng-switch>
+                <div class='description' ng-show='level.description' class='alignstretch'>
+                    <p>{{level.description}}</p>
+                </div>
+            </div>
+
+            <div class='hbox alignstretch abovelist'>
+
+            </div>
 
             <div ng-show='level.exists' ng-repeat='item in level.items' class='clickable browseitem hbox' ng-click='browse(item, item.path)'>
                 <div class='image' ng-show='item.canHaveImage'> 
